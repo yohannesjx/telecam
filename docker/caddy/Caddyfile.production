@@ -14,28 +14,14 @@
 		Referrer-Policy "no-referrer"
 	}
 
+	# Optional /api prefix (e.g. GET /api/health → GET /health on the API).
 	handle /api/* {
 		uri strip_prefix /api
 		reverse_proxy api:{$API_PORT:58081}
 	}
 
-	handle /health {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
-	handle /auth/* {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
-	handle /admin* {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
-	handle /parent* {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
+	# All other paths go to the Go API (/, /health, /auth, /parent, /admin, /db, /demo, …).
 	handle {
-		respond "school-camera-api"
+		reverse_proxy api:{$API_PORT:58081}
 	}
 }

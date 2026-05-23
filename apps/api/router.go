@@ -22,6 +22,8 @@ import (
 	parenthandlers "github.com/school-camera-platform/school-camera-platform/apps/api/handlers/parent"
 )
 
+const apiVersion = "1.0"
+
 func setupRouter(
 	logger *slog.Logger,
 	cfg *appconfig.Config,
@@ -70,10 +72,7 @@ func setupRouter(
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(requestLogger(logger))
-
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok", "service": "school-camera-api"})
-	})
+	registerCoreRoutes(router)
 
 	router.GET("/db/health", func(c *gin.Context) {
 		if err := db.Ping(c.Request.Context()); err != nil {
@@ -245,4 +244,21 @@ func setupRouter(
 	}
 
 	return router
+}
+
+func registerCoreRoutes(router *gin.Engine) {
+	router.GET("/", rootHandler)
+	router.GET("/health", healthHandler)
+}
+
+func rootHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "ok",
+		"service": "school-camera-api",
+		"version": apiVersion,
+	})
+}
+
+func healthHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 }

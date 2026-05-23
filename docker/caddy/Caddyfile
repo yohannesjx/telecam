@@ -9,31 +9,7 @@ http://localhost:80 {
 		reverse_proxy api:{$API_PORT:58081}
 	}
 
-	handle /health {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
-	handle /db/* {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
-	handle /demo/* {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
-	handle /auth/* {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
-	handle /admin* {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
-	handle /parent* {
-		reverse_proxy api:{$API_PORT:58081}
-	}
-
 	handle {
-		respond "school-camera-api"
+		reverse_proxy api:{$API_PORT:58081}
 	}
 }

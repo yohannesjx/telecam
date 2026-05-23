@@ -52,7 +52,8 @@ curl http://localhost:58081/demo/live
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /health` | API process health (no DB check) |
+| `GET /` | Service info JSON (`status`, `service`, `version`) |
+| `GET /health` | API process health: `{"status":"healthy"}` (no DB check) |
 | `GET /db/health` | PostgreSQL connectivity |
 | `GET /demo/live` | Presigned HLS playlist URL |
 
