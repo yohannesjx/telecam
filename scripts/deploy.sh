@@ -33,10 +33,24 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-# shellcheck disable=SC1091
-set -a
-source .env
-set +a
+# Read a few keys without "source .env" (passwords/URLs often contain ) ( ) $ etc.)
+env_val() {
+  local key="$1"
+  local line
+  line="$(grep -E "^${key}=" .env 2>/dev/null | head -1 || true)"
+  [[ -n "$line" ]] || return 0
+  line="${line#*=}"
+  line="${line%$'\r'}"
+  if [[ "$line" == \"*\" && "$line" == *\" ]]; then
+    line="${line:1:${#line}-2}"
+  elif [[ "$line" == \'*\' && "$line" == *\' ]]; then
+    line="${line:1:${#line}-2}"
+  fi
+  printf '%s' "$line"
+}
+
+APP_ENV="$(env_val APP_ENV)"
+DOMAIN="$(env_val DOMAIN)"
 
 if [[ "${APP_ENV:-local}" != "production" ]]; then
   echo "warning: APP_ENV is not 'production' — using production compose overlay anyway."
