@@ -1385,6 +1385,7 @@ Warnings (non-fatal): `sslmode=disable` on Postgres, Redis without password.
 
 ### Netcup deployment warnings
 
+- **Server `docker-compose.yml`:** If you customize compose on the server, run once: `git update-index --skip-worktree docker-compose.yml` so `git pull` does not overwrite it. `scripts/deploy.sh` does this automatically. To accept the repo version again: `git update-index --no-skip-worktree docker-compose.yml`. Prefer tracking shared production tweaks in `docker-compose.prod.yml` (pulled from git) and keeping host-only edits on the server file.
 - Expose only **80** and **443** (Caddy) — never Postgres, Redis, or MinIO console publicly.
 - Use **private R2 bucket** with presigned URLs only.
 - Use a **real domain** for HTTPS.
