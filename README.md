@@ -374,7 +374,40 @@ The API never streams video. It checks permissions against the database, then re
 - Camera, school, classroom ACTIVE
 - Parent has a child in the camera’s classroom
 - ACTIVE or TRIAL subscription for that school
+- Live only: current time within school schedule (see below)
 - Live only: `r2_live_path` object exists in MinIO
+
+### Live view vs playback/timeline
+
+**Live view** (`GET /parent/cameras/:camera_id/live`) is available **only during configured school hours** on recording weekdays. The API checks the school schedule (`SCHOOL_TIMEZONE`, `RECORDING_START_TIME`, `RECORDING_END_TIME`, `RECORDING_DAYS`) and `camera_stream_states.desired_state` from the scheduler-worker. Outside school hours or on weekends, live returns **409** with code `LIVE_OUTSIDE_SCHOOL_HOURS` (no signed URL).
+
+Default schedule: **Monday–Friday, 08:30–16:30** in `Africa/Addis_Ababa`.
+
+**Timeline** and **recording playback** are **not** blocked by the current clock. Parents can request previous recordings on weekends or outside school hours if:
+
+- Authorization and subscription checks pass
+- The requested date/range is valid (playback must still fall within school hours **for that calendar date**)
+- Recording segments exist within retention (cloud default **7 days** via `RETENTION_RECORDING_DAYS`)
+
+Example blocked live response:
+
+```json
+{
+  "error": "live view is not available outside school hours",
+  "code": "LIVE_OUTSIDE_SCHOOL_HOURS",
+  "data": {
+    "timezone": "Africa/Addis_Ababa",
+    "recording_days": ["MON", "TUE", "WED", "THU", "FRI"],
+    "recording_start_time": "08:30",
+    "recording_end_time": "16:30",
+    "next_live_available_at": "2026-05-25T05:30:00Z",
+    "desired_state": "STOPPED",
+    "stream_state_reason": "WEEKEND"
+  }
+}
+```
+
+Blocked live attempts are recorded in `audit_logs` as `PLAYBACK_ACCESS_DENIED` with reason `LIVE_OUTSIDE_SCHOOL_HOURS`.
 
 ### Example flow
 

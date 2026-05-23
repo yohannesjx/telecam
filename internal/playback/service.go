@@ -24,11 +24,26 @@ type auditEmitter interface {
 	Event(ctx context.Context, p audit.EventParams)
 }
 
+// objectStore is the storage surface required for signed URL playback.
+type objectStore interface {
+	ObjectExists(ctx context.Context, key string) (bool, error)
+	PresignGetObject(ctx context.Context, key string, expiry time.Duration) (string, error)
+	PutObject(ctx context.Context, key string, body []byte, contentType string) error
+}
+
+// playbackStore is the database surface required by the playback service.
+type playbackStore interface {
+	authorizeStore
+	GetCameraStreamState(ctx context.Context, cameraID uuid.UUID) (sqlc.CameraStreamState, error)
+	ListRecordingSegmentsByCameraDate(ctx context.Context, arg sqlc.ListRecordingSegmentsByCameraDateParams) ([]sqlc.RecordingSegment, error)
+	ListRecordingSegmentsByCameraRange(ctx context.Context, arg sqlc.ListRecordingSegmentsByCameraRangeParams) ([]sqlc.RecordingSegment, error)
+}
+
 // Service authorizes parent playback and issues signed URLs.
 type Service struct {
 	cfg      *appconfig.Config
-	q        *sqlc.Queries
-	storage  *storage.Client
+	q        playbackStore
+	storage  objectStore
 	audit    auditEmitter
 	schedule *Schedule
 	limiter  *RateLimiter
@@ -128,6 +143,15 @@ func (s *Service) Live(ctx context.Context, meta RequestMeta, cameraID uuid.UUID
 		return nil, err
 	}
 	cam := authz.Camera
+
+	if err := s.ensureLiveAvailable(ctx, cameraID); err != nil {
+		if IsLiveOutsideSchoolHours(err) {
+			s.auditLiveOutsideDenied(ctx, meta, cameraID, err)
+		} else {
+			s.auditDenied(ctx, meta, cameraID, "PLAYBACK_LIVE_REQUESTED", err, nil)
+		}
+		return nil, err
+	}
 
 	requested, err := hls.ResolveQuality(qualityParam)
 	if err != nil {
@@ -562,6 +586,9 @@ func (s *Service) auditDenied(ctx context.Context, meta RequestMeta, cameraID uu
 }
 
 func denialReasonForAudit(err error) string {
+	if IsLiveOutsideSchoolHours(err) {
+		return "LIVE_OUTSIDE_SCHOOL_HOURS"
+	}
 	var denied *ErrAccessDenied
 	if errors.As(err, &denied) {
 		return denied.InternalReasonOrDefault()

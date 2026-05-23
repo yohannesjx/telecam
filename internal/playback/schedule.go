@@ -15,6 +15,9 @@ type Schedule struct {
 	endH     int
 	endM     int
 	weekdays map[time.Weekday]bool
+	tzName   string
+	startRaw string
+	endRaw   string
 }
 
 // NewSchedule builds a schedule from config.
@@ -38,7 +41,43 @@ func NewSchedule(cfg *appconfig.Config) (*Schedule, error) {
 		endH:     eh,
 		endM:     em,
 		weekdays: cfg.RecordingWeekdays,
+		tzName:   cfg.SchoolTimezone,
+		startRaw: cfg.RecordingStartTime,
+		endRaw:   cfg.RecordingEndTime,
 	}, nil
+}
+
+// Timezone returns the configured IANA timezone name.
+func (s *Schedule) Timezone() string {
+	return s.tzName
+}
+
+// RecordingStartTime returns HH:MM school recording start.
+func (s *Schedule) RecordingStartTime() string {
+	return s.startRaw
+}
+
+// RecordingEndTime returns HH:MM school recording end.
+func (s *Schedule) RecordingEndTime() string {
+	return s.endRaw
+}
+
+// RecordingDaysList returns weekday abbreviations (MON, TUE, ...).
+func (s *Schedule) RecordingDaysList() []string {
+	order := []struct {
+		wd time.Weekday
+		ab string
+	}{
+		{time.Monday, "MON"}, {time.Tuesday, "TUE"}, {time.Wednesday, "WED"},
+		{time.Thursday, "THU"}, {time.Friday, "FRI"}, {time.Saturday, "SAT"}, {time.Sunday, "SUN"},
+	}
+	var out []string
+	for _, o := range order {
+		if s.weekdays[o.wd] {
+			out = append(out, o.ab)
+		}
+	}
+	return out
 }
 
 // IsWithinRecordingWindow reports whether t falls on a recording weekday and school hours.
@@ -48,6 +87,40 @@ func (s *Schedule) IsWithinRecordingWindow(t time.Time) bool {
 		return false
 	}
 	return withinHours(local, s.startH, s.startM, s.endH, s.endM)
+}
+
+// NextLiveAvailableAt returns the next time live view may be available (school timezone).
+func (s *Schedule) NextLiveAvailableAt(from time.Time) *time.Time {
+	local := from.In(s.loc)
+	if s.IsWithinRecordingWindow(from) {
+		return nil
+	}
+	if !s.weekdays[local.Weekday()] {
+		return s.nextRecordingStartAfter(local)
+	}
+	if withinHours(local, s.startH, s.startM, s.endH, s.endM) {
+		return nil
+	}
+	if local.Hour()*60+local.Minute() < s.startH*60+s.startM {
+		start := time.Date(local.Year(), local.Month(), local.Day(), s.startH, s.startM, 0, 0, s.loc)
+		return &start
+	}
+	return s.nextRecordingStartAfter(local)
+}
+
+func (s *Schedule) nextRecordingStartAfter(from time.Time) *time.Time {
+	local := from.In(s.loc)
+	for d := 0; d <= 14; d++ {
+		day := local.AddDate(0, 0, d)
+		if !s.weekdays[day.Weekday()] {
+			continue
+		}
+		start := time.Date(day.Year(), day.Month(), day.Day(), s.startH, s.startM, 0, 0, s.loc)
+		if start.After(local) {
+			return &start
+		}
+	}
+	return nil
 }
 
 // ValidateRange ensures start/end fall on allowed weekdays and within school hours.

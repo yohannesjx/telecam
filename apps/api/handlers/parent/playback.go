@@ -1,6 +1,7 @@
 package parent
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -32,6 +33,13 @@ func (h *Handler) handlePlaybackError(c *gin.Context, err error) {
 	if playback.IsNotFound(err) {
 		response.NotFound(c, err.Error())
 		return
+	}
+	if playback.IsLiveOutsideSchoolHours(err) {
+		var outside *playback.ErrLiveOutsideSchoolHours
+		if errors.As(err, &outside) {
+			response.ConflictWithCode(c, "LIVE_OUTSIDE_SCHOOL_HOURS", outside.Error(), outside.Data)
+			return
+		}
 	}
 	if playback.IsAccessDenied(err) {
 		response.Forbidden(c, err.Error())

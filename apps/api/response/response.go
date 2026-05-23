@@ -32,6 +32,18 @@ func Forbidden(c *gin.Context, message string) {
 	Error(c, http.StatusForbidden, message)
 }
 
+// ConflictWithCode writes a 409 payload with a machine-readable code and optional data.
+func ConflictWithCode(c *gin.Context, code, message string, data any) {
+	body := gin.H{
+		"error": message,
+		"code":  code,
+	}
+	if data != nil {
+		body["data"] = data
+	}
+	c.JSON(http.StatusConflict, body)
+}
+
 // TooManyRequests is a 429 helper.
 func TooManyRequests(c *gin.Context, message string) {
 	Error(c, http.StatusTooManyRequests, message)
