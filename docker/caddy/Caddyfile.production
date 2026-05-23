@@ -1,0 +1,41 @@
+# Production — automatic HTTPS via Let's Encrypt. Set DOMAIN and CADDY_EMAIL in .env.
+{
+	admin off
+	email {$CADDY_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+	}
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /health {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /auth/* {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /admin* {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /parent* {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle {
+		respond "school-camera-api"
+	}
+}

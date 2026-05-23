@@ -1,0 +1,39 @@
+# Default Caddy config for docker-compose (local). For production use Caddyfile.production — see README.
+{
+	admin off
+}
+
+http://localhost:80 {
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /health {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /db/* {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /demo/* {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /auth/* {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /admin* {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle /parent* {
+		reverse_proxy api:{$API_PORT:58081}
+	}
+
+	handle {
+		respond "school-camera-api"
+	}
+}

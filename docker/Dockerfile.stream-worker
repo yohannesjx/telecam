@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+
+ARG GO_VERSION=1.25
+FROM golang:${GO_VERSION}-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/stream-worker ./apps/stream-worker
+
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata ffmpeg
+
+WORKDIR /app
+
+COPY --from=builder /out/stream-worker /app/stream-worker
+
+ENTRYPOINT ["/app/stream-worker"]

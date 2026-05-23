@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_subscriptions_active_parent_school;

@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_recording_segments_camera_quality_expires;
+DROP INDEX IF EXISTS idx_recording_segments_camera_quality_start;

@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS camera_health_events;
+DROP TABLE IF EXISTS worker_heartbeats;
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS recording_segments;
+DROP TABLE IF EXISTS devices;
+DROP TABLE IF EXISTS subscriptions;
+DROP TABLE IF EXISTS cameras;
+DROP TABLE IF EXISTS parent_children;
+DROP TABLE IF EXISTS children;
+DROP TABLE IF EXISTS classrooms;
+DROP TABLE IF EXISTS schools;
+DROP TABLE IF EXISTS users;
+DROP FUNCTION IF EXISTS set_updated_at();

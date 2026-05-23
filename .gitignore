@@ -1,0 +1,42 @@
+# Environment — NEVER commit .env with real secrets
+.env
+.env.*
+!.env.example
+
+# Go
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# HLS temp
+tmp/hls/
+/tmp/hls/
+
+# Logs
+*.log
+
+# Docker
+.docker/
+
+# Sample video (large); keep .gitkeep in samples/
+samples/*.mp4
+samples/*.ts
+samples/*.m3u8
