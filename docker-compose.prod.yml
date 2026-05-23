@@ -1,0 +1,34 @@
+# Production overlay: use with
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# - Caddy on 80/443 with Let's Encrypt (Caddyfile.production)
+# - No host ports on Postgres, Redis, MinIO, or API (only reverse-proxy is public)
+
+services:
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  minio:
+    ports: !reset []
+
+  api:
+    ports: !reset []
+
+  # Skip dev seed on production deploys (workers still wait for this step).
+  migrate-seed:
+    image: alpine:3.20
+    entrypoint: ["sh", "-c", "echo 'migrate-seed skipped (production)'"]
+    restart: "no"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  reverse-proxy:
+    ports: !reset
+      - "80:80"
+      - "443:443"
+    volumes: !reset
+      - ./docker/caddy/Caddyfile.production:/etc/caddy/Caddyfile:ro
