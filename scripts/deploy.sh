@@ -5,6 +5,7 @@
 #   mkdir -p ~/cam && cd ~/cam
 #   git clone https://github.com/yohannesjx/telecam.git .
 #   cp .env.example .env && nano .env
+#   cp docker-compose.example.yml docker-compose.yml   # host-specific; not in git
 #   chmod +x scripts/deploy.sh
 #   ./scripts/deploy.sh
 #
@@ -56,9 +57,9 @@ if [[ "${APP_ENV:-local}" != "production" ]]; then
   echo "warning: APP_ENV is not 'production' — using production compose overlay anyway."
 fi
 
-# Keep server-specific docker-compose.yml when pulling (run once; safe to repeat).
-if git ls-files --error-unmatch docker-compose.yml >/dev/null 2>&1; then
-  git update-index --skip-worktree docker-compose.yml 2>/dev/null || true
+if [[ ! -f docker-compose.yml ]]; then
+  cp docker-compose.example.yml docker-compose.yml
+  echo "Created docker-compose.yml from docker-compose.example.yml (edit for this host; file is gitignored)."
 fi
 
 echo "==> Pulling $BRANCH from origin"

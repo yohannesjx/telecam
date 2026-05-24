@@ -35,6 +35,7 @@ tmp/hls/
 
 # Docker
 .docker/
+docker-compose.yml
 
 # Sample video (large); keep .gitkeep in samples/
 samples/*.mp4

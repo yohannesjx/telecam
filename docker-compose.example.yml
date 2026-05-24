@@ -1,3 +1,7 @@
+# Local / dev stack template — copy to docker-compose.yml (gitignored, per-host).
+#   cp docker-compose.example.yml docker-compose.yml
+# Production: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
 services:
   postgres:
     image: postgres:16-alpine
