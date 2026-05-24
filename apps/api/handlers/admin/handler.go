@@ -15,6 +15,7 @@ import (
 	"github.com/school-camera-platform/school-camera-platform/internal/database/sqlc"
 	"github.com/school-camera-platform/school-camera-platform/internal/encryption"
 	"github.com/school-camera-platform/school-camera-platform/internal/monitoring"
+	"github.com/school-camera-platform/school-camera-platform/internal/push"
 	"github.com/school-camera-platform/school-camera-platform/internal/storage"
 	"github.com/school-camera-platform/school-camera-platform/apps/api/response"
 )
@@ -28,6 +29,7 @@ type Handler struct {
 	cfg            *appconfig.Config
 	storage        *storage.Client
 	dashboardCache *monitoring.DashboardCache
+	push           *push.Service
 	validate       *validator.Validate
 	logger         *slog.Logger
 }
@@ -42,6 +44,7 @@ func NewHandler(
 	s3 *storage.Client,
 	rdb *redis.Client,
 	logger *slog.Logger,
+	pushSvc *push.Service,
 ) *Handler {
 	return &Handler{
 		q:              q,
@@ -51,6 +54,7 @@ func NewHandler(
 		cfg:            cfg,
 		storage:        s3,
 		dashboardCache: monitoring.NewDashboardCache(rdb, cfg.DashboardCacheTTL),
+		push:           pushSvc,
 		validate:       validator.New(),
 		logger:         logger,
 	}

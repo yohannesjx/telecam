@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +18,7 @@ import (
 	"github.com/school-camera-platform/school-camera-platform/internal/encryption"
 	"github.com/school-camera-platform/school-camera-platform/internal/hls"
 	"github.com/school-camera-platform/school-camera-platform/internal/playback"
+	"github.com/school-camera-platform/school-camera-platform/internal/push"
 	"github.com/school-camera-platform/school-camera-platform/internal/storage"
 	adminhandlers "github.com/school-camera-platform/school-camera-platform/apps/api/handlers/admin"
 	"github.com/school-camera-platform/school-camera-platform/apps/api/handlers"
@@ -61,7 +64,12 @@ func setupRouter(
 	access := admaccess.NewAccess(db.Queries)
 	authHandler := handlers.NewAuthHandler(authSvc, authLimiter, auditLog)
 	protectedHandler := handlers.NewProtectedHandler()
-	adminHandler := adminhandlers.NewHandler(db.Queries, access, auditLog, cipher, cfg, s3Client, rdb, logger)
+	pushSvc, err := push.NewService(context.Background(), cfg, db.Queries, logger)
+	if err != nil {
+		logger.Error("FCM init failed", "error", err)
+		os.Exit(1)
+	}
+	adminHandler := adminhandlers.NewHandler(db.Queries, access, auditLog, cipher, cfg, s3Client, rdb, logger, pushSvc)
 	playbackSvc, err := playback.NewService(cfg, db.Queries, s3Client, auditLog, rdb)
 	if err != nil {
 		logger.Error("playback service init failed", "error", err)
@@ -252,6 +260,10 @@ func setupRouter(
 		parent.GET("/subscriptions", parentHandler.ListSubscriptions)
 		parent.GET("/payments", parentHandler.ListPayments)
 		parent.GET("/invoices", parentHandler.ListInvoices)
+		parent.POST("/devices/push-token", parentHandler.RegisterPushToken)
+		parent.PATCH("/devices/notification-preferences", parentHandler.UpdateNotificationPreferences)
+		parent.GET("/devices/current", parentHandler.GetCurrentDevice)
+		parent.POST("/devices/push-disable", parentHandler.DisablePushNotifications)
 	}
 
 	return router

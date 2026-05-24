@@ -494,6 +494,10 @@ func (h *Handler) ApprovePayment(c *gin.Context) {
 	h.auditEvent(c, "PAYMENT_APPROVED", &actor.UserID, schoolID, map[string]any{
 		"payment_id": paymentID.String(),
 	})
+	if payment.ParentID.Valid && h.push != nil {
+		parentID := uuid.UUID(payment.ParentID.Bytes)
+		h.push.NotifyPaymentApproved(c.Request.Context(), parentID, paymentID)
+	}
 	response.OK(c, http.StatusOK, paymentDTOFromPayment(approved, ""))
 }
 
@@ -551,6 +555,10 @@ func (h *Handler) RejectPayment(c *gin.Context) {
 		"payment_id": paymentID.String(),
 		"notes":      req.Notes,
 	})
+	if payment.ParentID.Valid && h.push != nil {
+		parentID := uuid.UUID(payment.ParentID.Bytes)
+		h.push.NotifyPaymentRejected(c.Request.Context(), parentID, paymentID)
+	}
 	response.OK(c, http.StatusOK, paymentDTOFromPayment(rejected, ""))
 }
 
@@ -632,6 +640,9 @@ func (h *Handler) CreateInvoice(c *gin.Context) {
 		"invoice_id":     inv.ID.String(),
 		"invoice_number": inv.InvoiceNumber,
 	})
+	if h.push != nil {
+		h.push.NotifyInvoiceCreated(c.Request.Context(), parentID, inv.ID)
+	}
 	response.OK(c, http.StatusCreated, invoiceDTOFromInvoice(inv, ""))
 }
 

@@ -127,13 +127,24 @@ CREATE TABLE school_revenue_share (
 );
 
 CREATE TABLE devices (
-    id                 UUID PRIMARY KEY,
-    user_id            UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    device_name        TEXT,
-    device_fingerprint TEXT NOT NULL,
-    status             TEXT NOT NULL DEFAULT 'ACTIVE',
-    last_seen_at       TIMESTAMPTZ,
-    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                       UUID PRIMARY KEY,
+    user_id                  UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    device_name              TEXT,
+    device_fingerprint       TEXT NOT NULL,
+    status                   TEXT NOT NULL DEFAULT 'ACTIVE',
+    last_seen_at             TIMESTAMPTZ,
+    fcm_token                TEXT,
+    push_platform            TEXT,
+    notifications_enabled    BOOLEAN NOT NULL DEFAULT FALSE,
+    notification_preferences JSONB NOT NULL DEFAULT '{
+        "subscription_reminders": true,
+        "payment_updates": true,
+        "important_notices": true,
+        "camera_status_notices": false
+    }'::jsonb,
+    fcm_token_updated_at     TIMESTAMPTZ,
+    app_version              TEXT,
+    created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE recording_segments (

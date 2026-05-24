@@ -101,6 +101,11 @@ type Config struct {
 	AuthRefreshIPWindowSeconds        int
 	AuthRefreshTokenLimit             int
 	AuthRefreshTokenWindowSeconds     int
+
+	// Firebase Cloud Messaging (parent push)
+	FCMEnabled                   bool
+	FCMProjectID                 string
+	GoogleApplicationCredentials string
 }
 
 // IsProduction reports whether APP_ENV is production.
@@ -172,6 +177,9 @@ func Load() (*Config, error) {
 		AuthRefreshIPWindowSeconds:     envIntOr("AUTH_REFRESH_IP_WINDOW_SECONDS", 60),
 		AuthRefreshTokenLimit:          envIntOr("AUTH_REFRESH_TOKEN_LIMIT", 10),
 		AuthRefreshTokenWindowSeconds:  envIntOr("AUTH_REFRESH_TOKEN_WINDOW_SECONDS", 60),
+		FCMEnabled:                     envBoolOr("FCM_ENABLED", false),
+		FCMProjectID:                   envOr("FCM_PROJECT_ID", "school-camera-72810"),
+		GoogleApplicationCredentials:   envOr("GOOGLE_APPLICATION_CREDENTIALS", ""),
 	}
 	cfg.RecordingWeekdays = parseRecordingDays(envOr("RECORDING_DAYS", "MON,TUE,WED,THU,FRI"))
 	cfg.PostgresDSN = cfg.DatabaseURL
