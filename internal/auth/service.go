@@ -61,12 +61,26 @@ type TokenPair struct {
 
 // UserResponse is a safe user projection for API responses.
 type UserResponse struct {
-	ID       uuid.UUID `json:"id"`
-	FullName string    `json:"full_name"`
-	Email    string    `json:"email"`
-	Phone    string    `json:"phone,omitempty"`
-	Role     string    `json:"role"`
-	Status   string    `json:"status"`
+	ID                  uuid.UUID `json:"id"`
+	FullName            string    `json:"full_name"`
+	Email               string    `json:"email"`
+	Phone               string    `json:"phone,omitempty"`
+	Role                string    `json:"role"`
+	Status              string    `json:"status"`
+	ForcePasswordChange bool      `json:"force_password_change"`
+	PasswordChangedAt   *string   `json:"password_changed_at,omitempty"`
+	LastLoginAt         *string   `json:"last_login_at,omitempty"`
+	CreatedAt           *string   `json:"created_at,omitempty"`
+	UpdatedAt           *string   `json:"updated_at,omitempty"`
+}
+
+// ChangePasswordInput is the payload for changing the current user's password.
+type ChangePasswordInput struct {
+	CurrentPassword string
+	NewPassword     string
+	UserID          uuid.UUID
+	IPAddress       string
+	UserAgent       string
 }
 
 // Login authenticates a user and issues tokens.
@@ -111,7 +125,8 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (TokenPair, UserResp
 		},
 	})
 
-	// Track last login in Redis (optional session hint for future phases).
+	// Track last login in DB and Redis.
+	_ = s.q.UpdateUserLastLogin(ctx, user.ID)
 	if s.redis != nil {
 		key := fmt.Sprintf("auth:last_login:%s", user.ID)
 		_ = s.redis.Set(ctx, key, time.Now().UTC().Format(time.RFC3339), 24*time.Hour).Err()
@@ -219,6 +234,62 @@ func (s *Service) Me(ctx context.Context, userID uuid.UUID) (UserResponse, error
 	return toUserResponse(user), nil
 }
 
+// ChangePassword updates the authenticated user's password.
+func (s *Service) ChangePassword(ctx context.Context, in ChangePasswordInput) (UserResponse, error) {
+	if len(in.NewPassword) < 8 {
+		return UserResponse{}, fmt.Errorf("new password must be at least 8 characters")
+	}
+
+	user, err := s.q.GetUserByID(ctx, in.UserID)
+	if err != nil {
+		return UserResponse{}, err
+	}
+	if user.Status != userStatusActive {
+		return UserResponse{}, fmt.Errorf("user is not active")
+	}
+	if !user.PasswordHash.Valid {
+		return UserResponse{}, fmt.Errorf("invalid credentials")
+	}
+	if CheckPassword(user.PasswordHash.String, in.CurrentPassword) != nil {
+		return UserResponse{}, fmt.Errorf("invalid current password")
+	}
+	if CheckPassword(user.PasswordHash.String, in.NewPassword) == nil {
+		return UserResponse{}, fmt.Errorf("new password must differ from current password")
+	}
+
+	hash, err := HashPassword(in.NewPassword, s.cfg.BcryptCost)
+	if err != nil {
+		return UserResponse{}, err
+	}
+
+	updated, err := s.q.UpdateUserPasswordFull(ctx, sqlc.UpdateUserPasswordFullParams{
+		ID:                  in.UserID,
+		PasswordHash:        database.TextFromString(hash),
+		ForcePasswordChange: false,
+	})
+	if err != nil {
+		return UserResponse{}, err
+	}
+
+	action := "AUTH_PASSWORD_CHANGED"
+	if user.ForcePasswordChange {
+		action = "AUTH_FORCE_PASSWORD_CHANGE_COMPLETED"
+	}
+	s.audit.Event(ctx, audit.EventParams{
+		Action:    action,
+		UserID:    &in.UserID,
+		IPAddress: in.IPAddress,
+		UserAgent: in.UserAgent,
+	})
+
+	return toUserResponse(updated), nil
+}
+
+// RevokeAllSessions revokes all refresh tokens for a user.
+func (s *Service) RevokeAllSessions(ctx context.Context, userID uuid.UUID) error {
+	return s.q.RevokeAllUserRefreshTokens(ctx, userID)
+}
+
 func (s *Service) issueTokenPair(ctx context.Context, userID uuid.UUID, role, status string, deviceID *uuid.UUID) (TokenPair, error) {
 	if deviceID == nil || *deviceID == uuid.Nil {
 		return TokenPair{}, fmt.Errorf("device id required for token issue")
@@ -304,16 +375,33 @@ func (s *Service) auditLoginFailed(ctx context.Context, userID *uuid.UUID, in Lo
 
 func toUserResponse(u sqlc.User) UserResponse {
 	resp := UserResponse{
-		ID:       u.ID,
-		FullName: u.FullName,
-		Role:     u.Role,
-		Status:   u.Status,
+		ID:                  u.ID,
+		FullName:            u.FullName,
+		Role:                u.Role,
+		Status:              u.Status,
+		ForcePasswordChange: u.ForcePasswordChange,
 	}
 	if u.Email.Valid {
 		resp.Email = u.Email.String
 	}
 	if u.Phone.Valid {
 		resp.Phone = u.Phone.String
+	}
+	if u.PasswordChangedAt.Valid {
+		s := u.PasswordChangedAt.Time.UTC().Format(time.RFC3339)
+		resp.PasswordChangedAt = &s
+	}
+	if u.LastLoginAt.Valid {
+		s := u.LastLoginAt.Time.UTC().Format(time.RFC3339)
+		resp.LastLoginAt = &s
+	}
+	if u.CreatedAt.Valid {
+		s := u.CreatedAt.Time.UTC().Format(time.RFC3339)
+		resp.CreatedAt = &s
+	}
+	if u.UpdatedAt.Valid {
+		s := u.UpdatedAt.Time.UTC().Format(time.RFC3339)
+		resp.UpdatedAt = &s
 	}
 	return resp
 }

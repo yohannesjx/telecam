@@ -8,6 +8,7 @@ export type AuthUser = {
   role: UserRole;
   status: UserStatus;
   name?: string | null;
+  force_password_change?: boolean;
 };
 
 export type LoginRequest = {

@@ -29,7 +29,14 @@ export type Permission =
   | "billing:manage"
   | "auditLogs:view"
   | "system:view"
-  | "settings:view";
+  | "settings:view"
+  | "users:view"
+  | "users:create"
+  | "users:update"
+  | "users:resetPassword"
+  | "users:changeRole"
+  | "users:disable"
+  | "auth:changeOwnPassword";
 
 export const ROLE_PERMISSIONS: Record<DashboardRole, Permission[]> = {
   SUPER_ADMIN: [
@@ -60,6 +67,13 @@ export const ROLE_PERMISSIONS: Record<DashboardRole, Permission[]> = {
     "auditLogs:view",
     "system:view",
     "settings:view",
+    "users:view",
+    "users:create",
+    "users:update",
+    "users:resetPassword",
+    "users:changeRole",
+    "users:disable",
+    "auth:changeOwnPassword",
   ],
   SCHOOL_ADMIN: [
     "dashboard:view",
@@ -84,6 +98,7 @@ export const ROLE_PERMISSIONS: Record<DashboardRole, Permission[]> = {
     "billing:view",
     "billing:manage",
     "auditLogs:view",
+    "auth:changeOwnPassword",
   ],
   TECHNICIAN: [
     "dashboard:view",
@@ -92,6 +107,7 @@ export const ROLE_PERMISSIONS: Record<DashboardRole, Permission[]> = {
     "alerts:manage",
     "cameras:view",
     "system:view",
+    "auth:changeOwnPassword",
   ],
 };
 

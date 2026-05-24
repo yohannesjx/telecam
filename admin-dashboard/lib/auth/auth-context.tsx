@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import {
   assertDashboardAccess,
+  changePassword as changePasswordRequest,
   getMe,
   login as loginRequest,
   logout as logoutRequest,
@@ -45,6 +46,7 @@ type AuthContextValue = {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   refreshSession: () => Promise<string | null>;
   loadSession: () => Promise<void>;
 };
@@ -131,6 +133,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [applySession],
   );
 
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      const updatedUser = await changePasswordRequest(currentPassword, newPassword);
+      assertDashboardAccess(updatedUser);
+      const storedRefresh = getStoredRefreshToken();
+      if (!storedRefresh) {
+        clearSession();
+        return;
+      }
+      const token = accessToken ?? (await refreshSession());
+      if (token) {
+        setStoredUser(updatedUser);
+        setUser(updatedUser);
+      }
+    },
+    [accessToken, clearSession, refreshSession],
+  );
+
   const logout = useCallback(async () => {
     const storedRefresh = getStoredRefreshToken();
     const token = accessToken ?? undefined;
@@ -192,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       login,
       logout,
+      changePassword,
       refreshSession,
       loadSession,
     }),
@@ -202,6 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       login,
       logout,
+      changePassword,
       refreshSession,
       loadSession,
     ],

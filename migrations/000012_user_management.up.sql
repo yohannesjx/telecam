@@ -1,0 +1,5 @@
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS force_password_change BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS created_by_user_id UUID REFERENCES users (id) ON DELETE SET NULL;

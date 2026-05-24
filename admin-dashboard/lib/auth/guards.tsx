@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { isProtectedPath, publicRoutes } from "@/lib/routes";
 
+const CHANGE_PASSWORD_PATH = publicRoutes.changePassword;
+
 function SessionLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
@@ -19,16 +21,24 @@ function SessionLoading() {
 }
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+
+  const mustChangePassword = user?.force_password_change === true;
+  const isChangePasswordRoute =
+    pathname === CHANGE_PASSWORD_PATH || pathname.startsWith(`${CHANGE_PASSWORD_PATH}/`);
 
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated && isProtectedPath(pathname)) {
       router.replace(publicRoutes.login);
+      return;
     }
-  }, [isAuthenticated, isLoading, pathname, router]);
+    if (isAuthenticated && mustChangePassword && isProtectedPath(pathname) && !isChangePasswordRoute) {
+      router.replace(CHANGE_PASSWORD_PATH);
+    }
+  }, [isAuthenticated, isChangePasswordRoute, isLoading, mustChangePassword, pathname, router]);
 
   if (isLoading) {
     return <SessionLoading />;
@@ -38,18 +48,26 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  if (mustChangePassword && isProtectedPath(pathname) && !isChangePasswordRoute) {
+    return null;
+  }
+
   return <>{children}</>;
 }
 
 export function GuestOnly({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace(publicRoutes.dashboard);
+      if (user?.force_password_change) {
+        router.replace(CHANGE_PASSWORD_PATH);
+      } else {
+        router.replace(publicRoutes.dashboard);
+      }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router, user?.force_password_change]);
 
   if (isLoading) {
     return <SessionLoading />;

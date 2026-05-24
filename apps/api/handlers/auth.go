@@ -45,6 +45,11 @@ type logoutRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=8"`
+}
+
 func (h *AuthHandler) rateLimited(c *gin.Context, scope, ip, detail string) {
 	if h.audit != nil {
 		h.audit.Event(c.Request.Context(), audit.EventParams{
@@ -189,6 +194,48 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	profile, err := h.auth.Me(c.Request.Context(), user.UserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"user": profile})
+}
+
+// ChangePassword handles POST /auth/change-password.
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	user, ok := auth.UserFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req changePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	if err := h.validate.Struct(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	profile, err := h.auth.ChangePassword(c.Request.Context(), auth.ChangePasswordInput{
+		CurrentPassword: req.CurrentPassword,
+		NewPassword:     req.NewPassword,
+		UserID:          user.UserID,
+		IPAddress:       c.ClientIP(),
+		UserAgent:       c.Request.UserAgent(),
+	})
+	if err != nil {
+		msg := err.Error()
+		if strings.Contains(msg, "current password") || strings.Contains(msg, "credentials") {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": msg})
+			return
+		}
+		if strings.Contains(msg, "at least 8") || strings.Contains(msg, "differ") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
 		return
 	}
 

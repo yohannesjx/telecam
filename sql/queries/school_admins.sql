@@ -23,3 +23,7 @@ FROM school_admins sa
 INNER JOIN users u ON u.id = sa.user_id
 WHERE sa.school_id = $1
 ORDER BY sa.created_at;
+
+-- name: RemoveSchoolAdmin :exec
+DELETE FROM school_admins
+WHERE school_id = $1 AND user_id = $2;

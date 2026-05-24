@@ -66,6 +66,8 @@ export function normalizeUser(raw: unknown): AuthUser | null {
     role,
     status: normalizedStatus,
     name: pickString(raw, ["name", "full_name", "fullName"]) ?? null,
+    force_password_change:
+      raw.force_password_change === true || raw.forcePasswordChange === true,
   };
 }
 

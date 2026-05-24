@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Server,
   Settings,
+  UserCog,
   Users,
   GraduationCap,
 } from "lucide-react";
@@ -29,6 +30,7 @@ export const mainNavItems: NavItem[] = [
   { title: "Alerts", href: "/alerts", icon: Bell, enabled: true, permission: "alerts:view" },
   { title: "Cameras", href: "/cameras", icon: Camera, enabled: true, permission: "cameras:view" },
   { title: "Schools", href: "/schools", icon: Building2, enabled: true, permission: "schools:view" },
+  { title: "Users", href: "/users", icon: UserCog, enabled: true, permission: "users:view" },
   { title: "Parents", href: "/parents", icon: Users, enabled: true, permission: "parents:view" },
   { title: "Children", href: "/children", icon: GraduationCap, enabled: false, permission: "children:view" },
   { title: "Billing", href: "/billing/subscriptions", icon: CreditCard, enabled: true, permission: "billing:view" },
@@ -40,6 +42,7 @@ export const mainNavItems: NavItem[] = [
 export const publicRoutes = {
   login: "/login",
   dashboard: "/dashboard",
+  changePassword: "/change-password",
 } as const;
 
 /** Routes that require an authenticated admin session (Phase 2+). */
@@ -56,6 +59,8 @@ export const protectedRoutePrefixes = [
   "/audit-logs",
   "/system",
   "/settings",
+  "/users",
+  "/change-password",
 ] as const;
 
 export function isProtectedPath(pathname: string): boolean {

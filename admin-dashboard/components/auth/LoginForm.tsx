@@ -14,6 +14,7 @@ import {
   GENERIC_LOGIN_ERROR,
 } from "@/lib/auth/types";
 import { publicRoutes } from "@/lib/routes";
+import { getStoredUser } from "@/lib/auth/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,7 +45,12 @@ export function LoginForm() {
     setFormError(null);
     try {
       await login(values.email.trim(), values.password);
-      router.replace(publicRoutes.dashboard);
+      const stored = getStoredUser();
+      if (stored?.force_password_change) {
+        router.replace(publicRoutes.changePassword);
+      } else {
+        router.replace(publicRoutes.dashboard);
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
         setFormError(DASHBOARD_ACCESS_DENIED_MESSAGE);

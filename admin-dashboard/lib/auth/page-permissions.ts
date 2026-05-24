@@ -16,6 +16,8 @@ export const ROUTE_PERMISSIONS: Array<{
   { pattern: /^\/audit-logs/, permission: "auditLogs:view" },
   { pattern: /^\/system/, permission: "system:view" },
   { pattern: /^\/settings/, permission: "settings:view" },
+  { pattern: /^\/users/, permission: "users:view" },
+  { pattern: /^\/change-password/, permission: "auth:changeOwnPassword" },
 ];
 
 const SPECIAL_ROUTE_PERMISSIONS: Array<{
@@ -25,6 +27,8 @@ const SPECIAL_ROUTE_PERMISSIONS: Array<{
   { pattern: /^\/schools\/new\/?$/, permission: "schools:create" },
   { pattern: /^\/schools\/[^/]+\/edit\/?$/, permission: "schools:update" },
   { pattern: /^\/parents\/new\/?$/, permission: "parents:create" },
+  { pattern: /^\/users\/new\/?$/, permission: "users:create" },
+  { pattern: /^\/settings\/security\/?$/, permission: "auth:changeOwnPassword" },
 ];
 
 export function getRoutePermission(pathname: string): Permission | null {

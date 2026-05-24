@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	authpkg "github.com/school-camera-platform/school-camera-platform/internal/auth"
 	"github.com/school-camera-platform/school-camera-platform/internal/database"
@@ -38,13 +39,15 @@ func (h *Handler) CreateParent(c *gin.Context) {
 	}
 
 	user, err := h.q.CreateUser(c.Request.Context(), sqlc.CreateUserParams{
-		ID:           uuid.New(),
-		FullName:     req.FullName,
-		Phone:        database.TextFromString(req.Phone),
-		Email:        database.TextFromString(req.Email),
-		PasswordHash: database.TextFromString(hash),
-		Role:         "PARENT",
-		Status:       "ACTIVE",
+		ID:                  uuid.New(),
+		FullName:            req.FullName,
+		Phone:               database.TextFromString(req.Phone),
+		Email:               database.TextFromString(req.Email),
+		PasswordHash:        database.TextFromString(hash),
+		Role:                "PARENT",
+		Status:              "ACTIVE",
+		ForcePasswordChange: false,
+		CreatedByUserID:     pgtype.UUID{},
 	})
 	if err != nil {
 		response.Internal(c, "failed to create parent (email may already exist)")

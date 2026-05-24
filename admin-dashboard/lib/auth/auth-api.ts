@@ -148,6 +148,20 @@ export async function getMe(accessToken: string): Promise<AuthUser> {
   return parseMeResponse(raw);
 }
 
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<AuthUser> {
+  const raw = await apiFetch<unknown>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+  return parseMeResponse(raw);
+}
+
 export function assertDashboardAccess(user: AuthUser): void {
   if (user.status !== "ACTIVE") {
     throw new ApiError(DASHBOARD_ACCESS_DENIED_MESSAGE, 403);

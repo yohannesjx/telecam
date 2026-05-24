@@ -27,3 +27,9 @@ SET revoked_at = NOW()
 WHERE user_id = $1
   AND device_id = $2
   AND revoked_at IS NULL;
+
+-- name: RevokeAllUserRefreshTokens :exec
+UPDATE refresh_tokens
+SET revoked_at = NOW()
+WHERE user_id = $1
+  AND revoked_at IS NULL;

@@ -115,6 +115,7 @@ func setupRouter(
 		authed.Use(auth.AuthMiddleware(jwtSvc))
 		authed.GET("/me", authHandler.Me)
 		authed.POST("/logout", authHandler.Logout)
+		authed.POST("/change-password", authHandler.ChangePassword)
 	}
 
 	admin := router.Group("/admin")
@@ -128,6 +129,15 @@ func setupRouter(
 		superAdmin.POST("/schools/:school_id/admins", adminHandler.AssignSchoolAdmin)
 		superAdmin.GET("/schools/:school_id/admins", adminHandler.ListSchoolAdmins)
 		superAdmin.GET("/parents", adminHandler.ListParents)
+		superAdmin.GET("/users", adminHandler.ListUsers)
+		superAdmin.POST("/users", adminHandler.CreateUser)
+		superAdmin.GET("/users/:id", adminHandler.GetUser)
+		superAdmin.PATCH("/users/:id", adminHandler.PatchUser)
+		superAdmin.PATCH("/users/:id/status", adminHandler.PatchUserStatus)
+		superAdmin.PATCH("/users/:id/role", adminHandler.PatchUserRole)
+		superAdmin.POST("/users/:id/reset-password", adminHandler.ResetUserPassword)
+		superAdmin.POST("/users/:id/force-password-change", adminHandler.ForceUserPasswordChange)
+		superAdmin.PUT("/users/:id/schools", adminHandler.AssignUserSchools)
 		superAdmin.GET("/alert-deliveries", adminHandler.ListAlertDeliveries)
 		superAdmin.POST("/schools/:school_id/revenue-share", adminHandler.SetSchoolRevenueShare)
 	}

@@ -1,15 +1,19 @@
 -- Canonical schema for sqlc (mirrors migrations/000001_init_schema.up.sql tables)
 
 CREATE TABLE users (
-    id            UUID PRIMARY KEY,
-    full_name     TEXT NOT NULL,
-    phone         TEXT UNIQUE,
-    email         TEXT UNIQUE,
-    password_hash TEXT,
-    role          TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'ACTIVE',
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                    UUID PRIMARY KEY,
+    full_name             TEXT NOT NULL,
+    phone                 TEXT UNIQUE,
+    email                 TEXT UNIQUE,
+    password_hash         TEXT,
+    role                  TEXT NOT NULL,
+    status                TEXT NOT NULL DEFAULT 'ACTIVE',
+    force_password_change BOOLEAN NOT NULL DEFAULT false,
+    password_changed_at   TIMESTAMPTZ,
+    last_login_at         TIMESTAMPTZ,
+    created_by_user_id    UUID REFERENCES users (id) ON DELETE SET NULL,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE schools (
