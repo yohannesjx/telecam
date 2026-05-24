@@ -83,6 +83,7 @@ type Config struct {
 	AppEnv              string
 	Domain              string
 	CaddyEmail          string
+	CORSAllowedOrigins  []string
 	DemoLiveEnabled     bool
 	TelegramAlertsEnabled bool
 	TelegramBotToken    string
@@ -155,6 +156,7 @@ func Load() (*Config, error) {
 		AppEnv:                         appEnv,
 		Domain:                         envOr("DOMAIN", "localhost"),
 		CaddyEmail:                     envOr("CADDY_EMAIL", ""),
+		CORSAllowedOrigins:             parseCORSAllowedOrigins(appEnv),
 		DemoLiveEnabled:                envBoolOr("DEMO_LIVE_ENABLED", demoLiveDefault),
 		TelegramAlertsEnabled:          envBoolOr("TELEGRAM_ALERTS_ENABLED", false),
 		TelegramBotToken:               envOr("TELEGRAM_BOT_TOKEN", ""),
@@ -265,4 +267,23 @@ func envDurationOr(key string, def time.Duration) time.Duration {
 		}
 	}
 	return def
+}
+
+func parseCORSAllowedOrigins(appEnv string) []string {
+	raw := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if raw == "" && !strings.EqualFold(appEnv, "production") {
+		raw = "http://localhost:53000,http://127.0.0.1:53000"
+	}
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		origin := strings.TrimSpace(part)
+		if origin != "" {
+			out = append(out, origin)
+		}
+	}
+	return out
 }

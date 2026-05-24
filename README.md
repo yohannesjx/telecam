@@ -1424,6 +1424,33 @@ Do not paste RTSP credentials into logs or screenshots. RTSP URLs are configured
 
 Phase **18B** (next): first real RTSP/NVR end-to-end test using this setup.
 
+## Admin dashboard (Phase 1)
+
+Next.js admin UI in [`admin-dashboard/`](admin-dashboard/README.md).
+
+```bash
+cd admin-dashboard
+cp .env.example .env.local
+npm install
+npm run dev -- -p 53000
+```
+
+Docker (binds **127.0.0.1:53000** only):
+
+```bash
+cd admin-dashboard
+docker compose -f docker-compose.dashboard.yml up -d --build
+```
+
+Phase 1: layout shell, `/login` placeholder, `/dashboard` demo metrics.
+
+**Phase 2:** Real admin login via `/auth/login`, session refresh, protected `/dashboard`, role blocking (`PARENT` denied). See [`admin-dashboard/README.md`](admin-dashboard/README.md).
+
+```bash
+cd admin-dashboard && npm run dev -- -p 53000
+# http://localhost:53000/login
+```
+
 ## Not in scope yet
 
 - Technician school assignment table

@@ -71,6 +71,7 @@ func setupRouter(
 
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 	router.Use(requestLogger(logger))
 	registerCoreRoutes(router)
 

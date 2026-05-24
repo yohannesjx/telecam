@@ -1,0 +1,14 @@
+services:
+  admin-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/backend}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:53000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api/backend}
+      API_PROXY_TARGET: ${API_PROXY_TARGET:-https://camera.iglooks.com/api}
