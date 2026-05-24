@@ -57,6 +57,12 @@ func NewService(ctx context.Context, cfg *appconfig.Config, q *sqlc.Queries, log
 	return svc, nil
 }
 
+// NewDisabledService returns a no-op push sender when FCM cannot be initialized.
+func NewDisabledService(q *sqlc.Queries, logger *slog.Logger) *Service {
+	logger.Warn("FCM push disabled (using no-op sender)")
+	return &Service{enabled: false, q: q, logger: logger}
+}
+
 // SendToUser delivers a notification to all eligible devices for a parent user.
 func (s *Service) SendToUser(ctx context.Context, userID uuid.UUID, p Payload) error {
 	if !s.enabled || s.client == nil {

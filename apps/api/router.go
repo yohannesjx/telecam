@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -66,8 +65,8 @@ func setupRouter(
 	protectedHandler := handlers.NewProtectedHandler()
 	pushSvc, err := push.NewService(context.Background(), cfg, db.Queries, logger)
 	if err != nil {
-		logger.Error("FCM init failed", "error", err)
-		os.Exit(1)
+		logger.Error("FCM init failed; API will run without push", "error", err)
+		pushSvc = push.NewDisabledService(db.Queries, logger)
 	}
 	adminHandler := adminhandlers.NewHandler(db.Queries, access, auditLog, cipher, cfg, s3Client, rdb, logger, pushSvc)
 	playbackSvc, err := playback.NewService(cfg, db.Queries, s3Client, auditLog, rdb)
