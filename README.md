@@ -325,7 +325,7 @@ curl -X POST http://localhost:58081/admin/schools/SCHOOL_ID/cameras \
     "classroom_id":"CLASSROOM_ID",
     "name":"Classroom 1 Camera",
     "rtsp_url":"rtsp://user:pass@camera/stream",
-    "r2_live_path":"cameras/school-id/camera-id/live/index.m3u8",
+    "r2_live_path":"cameras/{school_id}/{camera_id}/live/sd_360p/index.m3u8",
     "r2_recording_path":"cameras/school-id/camera-id/recordings/",
     "default_quality":"sd_360p"
   }'
@@ -674,9 +674,11 @@ docker compose exec -T postgres psql -U school_camera_user -d school_camera -c \
 
 ### RTSP testing
 
-1. Set `STREAM_WORKER_MODE=rtsp` or `mixed`
+For **production / Netcup** pilots over Tailscale, see [docs/school-connectivity.md](docs/school-connectivity.md) and run `./scripts/test-rtsp.sh` before adding cameras.
+
+1. Set `STREAM_WORKER_MODE=mixed` (first real camera) or `rtsp` (all real cameras)
 2. Ensure `APP_ENCRYPTION_KEY` matches the API
-3. Create/update a camera with `rtsp_url` via admin API (stored encrypted)
+3. Create/update a camera with `rtsp_url` via admin API (stored encrypted; never returned in responses)
 4. Set `r2_live_path` to `cameras/{school_id}/{camera_id}/live/sd_360p/index.m3u8`
 5. Watch logs for `CAMERA_STREAM_STARTED` and uploads (no RTSP URL in output)
 
@@ -1391,6 +1393,36 @@ Warnings (non-fatal): `sslmode=disable` on Postgres, Redis without password.
 - Use **private R2 bucket** with presigned URLs only.
 - Use a **real domain** for HTTPS.
 - Rotate any secret that ever appeared in git or chat.
+
+## School connectivity (Phase 18A)
+
+Prepare secure school NVR/camera connectivity **without** public RTSP or port forwarding.
+
+| Document | Purpose |
+|----------|---------|
+| [docs/school-connectivity.md](docs/school-connectivity.md) | Tailscale pilot, security rules, RTSP test procedure, troubleshooting |
+| [docs/school-onboarding-checklist.md](docs/school-onboarding-checklist.md) | Privacy, network, and technical sign-off checklist |
+
+**Security (non-negotiable):** No public RTSP, no NVR port forwarding, no exposed camera admin panels. Only `stream-worker` reaches RTSP over VPN; parents get signed HLS URLs only.
+
+**First pilot:** Install Tailscale on Netcup and a school-side gateway; test with:
+
+```bash
+chmod +x scripts/test-rtsp.sh
+./scripts/test-rtsp.sh "rtsp://user:pass@100.x.y.z:554/Streaming/Channels/102"
+```
+
+Docker alternative (if host has no `ffprobe`):
+
+```bash
+USE_DOCKER=1 ./scripts/test-rtsp.sh "rtsp://user:pass@100.x.y.z:554/path"
+```
+
+Do not paste RTSP credentials into logs or screenshots. RTSP URLs are configured via the admin API only — not in `.env`.
+
+**Stream worker mode for first real camera:** `STREAM_WORKER_MODE=mixed` (keeps demo if needed). Later: `STREAM_WORKER_MODE=rtsp`.
+
+Phase **18B** (next): first real RTSP/NVR end-to-end test using this setup.
 
 ## Not in scope yet
 
