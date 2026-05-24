@@ -117,16 +117,37 @@ const PERMISSION_SET: Record<DashboardRole, ReadonlySet<Permission>> = {
   TECHNICIAN: new Set(ROLE_PERMISSIONS.TECHNICIAN),
 };
 
+const DASHBOARD_ROLES: DashboardRole[] = ["SUPER_ADMIN", "SCHOOL_ADMIN", "TECHNICIAN"];
+
+/** Canonical dashboard role (trimmed, uppercased). */
+export function normalizeDashboardRole(
+  role: string | undefined | null,
+): DashboardRole | null {
+  if (!role || typeof role !== "string") return null;
+  const upper = role.trim().toUpperCase().replace(/-/g, "_").replace(/\s+/g, "_");
+  if (upper === "SUPERADMIN") return "SUPER_ADMIN";
+  if (upper === "SCHOOLADMIN") return "SCHOOL_ADMIN";
+  if (DASHBOARD_ROLES.includes(upper as DashboardRole)) return upper as DashboardRole;
+  return null;
+}
+
 export function isDashboardRole(role: string | undefined | null): role is DashboardRole {
-  return role === "SUPER_ADMIN" || role === "SCHOOL_ADMIN" || role === "TECHNICIAN";
+  return normalizeDashboardRole(role) !== null;
+}
+
+export function getPermissionsForRole(role: string | undefined | null): Permission[] {
+  const dashboardRole = normalizeDashboardRole(role);
+  if (!dashboardRole) return [];
+  return ROLE_PERMISSIONS[dashboardRole];
 }
 
 export function hasPermission(
   role: string | undefined | null,
   permission: Permission,
 ): boolean {
-  if (!isDashboardRole(role)) return false;
-  return PERMISSION_SET[role].has(permission);
+  const dashboardRole = normalizeDashboardRole(role);
+  if (!dashboardRole) return false;
+  return PERMISSION_SET[dashboardRole].has(permission);
 }
 
 export function hasAnyPermission(

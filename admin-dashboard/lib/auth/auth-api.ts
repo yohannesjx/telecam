@@ -11,6 +11,7 @@ import type {
   MeResponse,
   RefreshResponse,
 } from "@/lib/auth/types";
+import { normalizeDashboardRole } from "@/lib/auth/permissions";
 import {
   ALLOWED_DASHBOARD_ROLES,
   DASHBOARD_ACCESS_DENIED_MESSAGE,
@@ -166,7 +167,8 @@ export function assertDashboardAccess(user: AuthUser): void {
   if (user.status !== "ACTIVE") {
     throw new ApiError(DASHBOARD_ACCESS_DENIED_MESSAGE, 403);
   }
-  if (!ALLOWED_DASHBOARD_ROLES.includes(user.role)) {
+  const role = normalizeDashboardRole(user.role);
+  if (!role || !ALLOWED_DASHBOARD_ROLES.includes(role)) {
     throw new ApiError(DASHBOARD_ACCESS_DENIED_MESSAGE, 403);
   }
 }

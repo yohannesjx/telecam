@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { ChevronDown, LogOut } from "lucide-react";
 
+import { AuthDevInfo } from "@/components/auth/AuthDevInfo";
 import { useAuth } from "@/lib/auth/auth-context";
+import { normalizeDashboardRole } from "@/lib/auth/permissions";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -54,7 +56,7 @@ export function UserMenu() {
             {user.email}
           </p>
           <StatusBadge
-            label={formatRole(user.role)}
+            label={formatRole(normalizeDashboardRole(user.role) ?? user.role)}
             tone="info"
             className="mt-0.5 px-1.5 py-0 text-[10px]"
           />
@@ -82,6 +84,7 @@ export function UserMenu() {
                 className="mt-1 px-1.5 py-0 text-[10px]"
               />
             </div>
+            <AuthDevInfo />
             <Button
               variant="ghost"
               size="sm"

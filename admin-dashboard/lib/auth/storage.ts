@@ -1,4 +1,5 @@
 import type { AuthUser } from "@/lib/auth/types";
+import { normalizeUser } from "@/lib/auth/session-store";
 
 const REFRESH_TOKEN_KEY = "sc_refresh_token";
 const USER_KEY = "sc_user";
@@ -27,7 +28,7 @@ export function getStoredUser(): AuthUser | null {
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as AuthUser;
+    return normalizeUser(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }

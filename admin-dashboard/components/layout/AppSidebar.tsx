@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth/auth-context";
-import { hasPermission } from "@/lib/auth/permissions";
+import { hasPermission, normalizeDashboardRole } from "@/lib/auth/permissions";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import {
   navActiveIndicator,
@@ -44,8 +44,10 @@ export function AppSidebar() {
 
   const iconOnly = collapsed && !mobileOpen;
 
+  const dashboardRole = normalizeDashboardRole(user?.role);
+
   const visibleNavItems = mainNavItems.filter(
-    (item) => item.enabled && hasPermission(user?.role, item.permission),
+    (item) => item.enabled && hasPermission(dashboardRole ?? user?.role, item.permission),
   );
 
   const handleLogout = async () => {
@@ -96,6 +98,7 @@ export function AppSidebar() {
             (item.href.startsWith("/billing") && pathname.startsWith("/billing")) ||
             (item.href === "/audit-logs" && pathname.startsWith("/audit-logs")) ||
             (item.href === "/system" && pathname.startsWith("/system")) ||
+            (item.href === "/users" && pathname.startsWith("/users")) ||
             pathname.startsWith(`${item.href}/`);
 
           return (
@@ -162,7 +165,7 @@ export function AppSidebar() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-slate-900">{user.email}</p>
                 <StatusBadge
-                  label={formatRole(user.role)}
+                  label={formatRole(dashboardRole ?? user.role)}
                   tone="info"
                   className="mt-1 px-2 py-0 text-[10px]"
                 />

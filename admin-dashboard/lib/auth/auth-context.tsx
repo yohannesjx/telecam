@@ -29,6 +29,7 @@ import {
   setStoredUser,
 } from "@/lib/auth/storage";
 import {
+  normalizeUser,
   registerLogoutHandler,
   registerRefreshHandler,
   setAccessToken,
@@ -91,10 +92,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const refreshed = await refreshRequest(storedRefresh);
     const nextRefresh = refreshed.refresh_token ?? storedRefresh;
-    let nextUser = refreshed.user ?? getStoredUser();
 
-    if (!nextUser) {
+    let nextUser =
+      (refreshed.user ? normalizeUser(refreshed.user) : null) ??
+      getStoredUser() ??
+      null;
+
+    try {
       nextUser = await getMe(refreshed.access_token);
+    } catch {
+      if (!nextUser) throw new Error("failed to load user profile");
     }
 
     applySession(refreshed.access_token, nextRefresh, nextUser);

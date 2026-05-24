@@ -46,25 +46,50 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | unde
 const VALID_ROLES: UserRole[] = ["SUPER_ADMIN", "SCHOOL_ADMIN", "TECHNICIAN", "PARENT"];
 const VALID_STATUSES: UserStatus[] = ["ACTIVE", "BLOCKED", "DISABLED"];
 
+function pickId(obj: Record<string, unknown>): string | undefined {
+  const direct = pickString(obj, ["id", "user_id", "userId"]);
+  if (direct) return direct;
+  const nested = obj.user;
+  if (isRecord(nested)) return pickString(nested, ["id", "user_id", "userId"]);
+  return undefined;
+}
+
+function normalizeUserRole(value: unknown): UserRole | null {
+  if (typeof value !== "string") return null;
+  const upper = value.trim().toUpperCase().replace(/-/g, "_").replace(/\s+/g, "_");
+  if (upper === "SUPERADMIN") return "SUPER_ADMIN";
+  if (upper === "SCHOOLADMIN") return "SCHOOL_ADMIN";
+  if (VALID_ROLES.includes(upper as UserRole)) return upper as UserRole;
+  return null;
+}
+
+function normalizeUserStatus(value: unknown): UserStatus {
+  if (typeof value !== "string") return "ACTIVE";
+  const upper = value.trim().toUpperCase();
+  if (VALID_STATUSES.includes(upper as UserStatus)) return upper as UserStatus;
+  return "ACTIVE";
+}
+
 export function normalizeUser(raw: unknown): AuthUser | null {
   if (!isRecord(raw)) return null;
 
-  const id = pickString(raw, ["id"]);
-  const email = pickString(raw, ["email"]);
-  const role = pickString(raw, ["role"]) as UserRole | undefined;
-  const status = pickString(raw, ["status"]) as UserStatus | undefined;
+  const id = pickId(raw);
+  const email = pickString(raw, ["email"]) ?? (isRecord(raw.user) ? pickString(raw.user, ["email"]) : undefined);
+  const role =
+    normalizeUserRole(raw.role) ??
+    normalizeUserRole(raw.user_role) ??
+    normalizeUserRole(raw.userRole) ??
+    (isRecord(raw.user) ? normalizeUserRole(raw.user.role) : null);
 
-  if (!id || !email || !role || !VALID_ROLES.includes(role)) {
+  if (!id || !email || !role) {
     return null;
   }
 
-  const normalizedStatus = status && VALID_STATUSES.includes(status) ? status : "ACTIVE";
-
   return {
     id,
-    email,
+    email: email.trim(),
     role,
-    status: normalizedStatus,
+    status: normalizeUserStatus(raw.status ?? (isRecord(raw.user) ? raw.user.status : undefined)),
     name: pickString(raw, ["name", "full_name", "fullName"]) ?? null,
     force_password_change:
       raw.force_password_change === true || raw.forcePasswordChange === true,
