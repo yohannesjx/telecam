@@ -1,0 +1,15 @@
+# Local / dev Caddy — proxy all traffic to the API (no placeholder respond).
+# Production: use docker/caddy/Caddyfile.production instead.
+
+:80 {
+	encode gzip
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:58081
+	}
+
+	handle {
+		reverse_proxy api:58081
+	}
+}

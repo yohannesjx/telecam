@@ -81,6 +81,7 @@ func setupRouter(
 	router.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 	router.Use(requestLogger(logger))
 	registerCoreRoutes(router)
+	registerNoRouteHandler(router)
 
 	router.GET("/db/health", func(c *gin.Context) {
 		if err := db.Ping(c.Request.Context()); err != nil {
@@ -273,11 +274,23 @@ func registerCoreRoutes(router *gin.Engine) {
 	router.GET("/health", healthHandler)
 }
 
+func registerNoRouteHandler(router *gin.Engine) {
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "not found",
+			"path":    c.Request.URL.Path,
+			"service": "school-camera-api",
+			"hint":    "Use /health, /auth/*, /parent/*, or /admin/*",
+		})
+	})
+}
+
 func rootHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
 		"service": "school-camera-api",
 		"version": apiVersion,
+		"message": "API is running - routes should be available",
 	})
 }
 

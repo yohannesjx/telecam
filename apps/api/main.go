@@ -59,11 +59,12 @@ func main() {
 
 	gin.SetMode(gin.ReleaseMode)
 	router := setupRouter(logger, cfg, db, s3Client, rdb)
+	logger.Info("http routes registered", "endpoints", "/, /health, /auth, /parent, /admin, /api/*")
 
 	addr := ":" + cfg.APIPort
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           router,
+		Handler:           stripAPIPrefixHandler(router),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
