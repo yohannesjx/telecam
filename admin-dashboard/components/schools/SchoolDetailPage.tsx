@@ -13,6 +13,7 @@ import { SchoolChildrenTab } from "@/components/schools/SchoolChildrenTab";
 import { SchoolClassroomsTab } from "@/components/schools/SchoolClassroomsTab";
 import { SchoolOverviewTab } from "@/components/schools/SchoolOverviewTab";
 import { SchoolParentsTab } from "@/components/schools/SchoolParentsTab";
+import { SchoolScheduleTab } from "@/components/schools/SchoolScheduleTab";
 import { SchoolStatusBadge } from "@/components/schools/SchoolStatusBadge";
 import { SchoolStorageTab } from "@/components/schools/SchoolStorageTab";
 import { SchoolsError } from "@/components/schools/SchoolsError";
@@ -38,6 +39,7 @@ const TABS = [
   { id: "children", label: "Children" },
   { id: "parents", label: "Parents" },
   { id: "cameras", label: "Cameras" },
+  { id: "schedule", label: "School Hours" },
   { id: "billing", label: "Billing" },
   { id: "alerts", label: "Alerts" },
   { id: "storage", label: "Storage" },
@@ -51,6 +53,7 @@ const TAB_PERMISSIONS: Record<TabId, Permission> = {
   children: "children:view",
   parents: "parents:view",
   cameras: "cameras:view",
+  schedule: "schools:view",
   billing: "billing:view",
   alerts: "alerts:view",
   storage: "billing:view",
@@ -207,6 +210,7 @@ export function SchoolDetailPage({ schoolId }: { schoolId: string }) {
       {tab === "cameras" ? (
         <SchoolCamerasTab schoolId={school.id} schoolName={school.name} />
       ) : null}
+      {tab === "schedule" ? <SchoolScheduleTab schoolId={school.id} /> : null}
       {tab === "billing" ? (
         <SchoolBillingTab
           schoolId={school.id}

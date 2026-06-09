@@ -5,6 +5,7 @@ import (
 	"time"
 
 	appconfig "github.com/school-camera-platform/school-camera-platform/internal/config"
+	"github.com/school-camera-platform/school-camera-platform/internal/schoolschedule"
 )
 
 // Schedule validates recording window rules in the school timezone.
@@ -121,6 +122,29 @@ func (s *Schedule) nextRecordingStartAfter(from time.Time) *time.Time {
 		}
 	}
 	return nil
+}
+
+// toEvalResult converts this global Schedule to an EvalResult at time t.
+// Used by evaluateLiveAccess for backward compatibility with tests that construct
+// Service without a per-school Evaluator.
+func (s *Schedule) toEvalResult(t time.Time) schoolschedule.EvalResult {
+	inWindow := s.IsWithinRecordingWindow(t)
+	result := schoolschedule.EvalResult{
+		Timezone:    s.tzName,
+		OpenDays:    s.RecordingDaysList(),
+		OpenTime:    s.startRaw,
+		CloseTime:   s.endRaw,
+		LiveEnabled: true,
+	}
+	if inWindow {
+		result.IsOpenNow = true
+		result.ReasonCode = schoolschedule.ReasonOpen
+	} else {
+		result.IsOpenNow = false
+		result.ReasonCode = schoolschedule.ReasonOutsideHours
+		result.NextLiveAvailableAt = s.NextLiveAvailableAt(t)
+	}
+	return result
 }
 
 // ValidateRange ensures start/end fall on allowed weekdays and within school hours.

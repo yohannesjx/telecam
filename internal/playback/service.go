@@ -16,6 +16,7 @@ import (
 	"github.com/school-camera-platform/school-camera-platform/internal/audit"
 	"github.com/school-camera-platform/school-camera-platform/internal/database/sqlc"
 	"github.com/school-camera-platform/school-camera-platform/internal/hls"
+	"github.com/school-camera-platform/school-camera-platform/internal/schoolschedule"
 	"github.com/school-camera-platform/school-camera-platform/internal/storage"
 )
 
@@ -41,12 +42,13 @@ type playbackStore interface {
 
 // Service authorizes parent playback and issues signed URLs.
 type Service struct {
-	cfg      *appconfig.Config
-	q        playbackStore
-	storage  objectStore
-	audit    auditEmitter
-	schedule *Schedule
-	limiter  *RateLimiter
+	cfg       *appconfig.Config
+	q         playbackStore
+	storage   objectStore
+	audit     auditEmitter
+	schedule  *Schedule
+	schedEval *schoolschedule.Evaluator
+	limiter   *RateLimiter
 }
 
 // NewService constructs a playback service.
@@ -62,12 +64,13 @@ func NewService(
 		return nil, err
 	}
 	return &Service{
-		cfg:      cfg,
-		q:        q,
-		storage:  s3,
-		audit:    auditLog,
-		schedule: sched,
-		limiter:  NewRateLimiter(rdb, cfg.PlaybackRateLimitPerMinute),
+		cfg:       cfg,
+		q:         q,
+		storage:   s3,
+		audit:     auditLog,
+		schedule:  sched,
+		schedEval: schoolschedule.NewEvaluator(q, schoolschedule.DefaultsFromConfig(cfg)),
+		limiter:   NewRateLimiter(rdb, cfg.PlaybackRateLimitPerMinute),
 	}, nil
 }
 
@@ -144,7 +147,7 @@ func (s *Service) Live(ctx context.Context, meta RequestMeta, cameraID uuid.UUID
 	}
 	cam := authz.Camera
 
-	if err := s.ensureLiveAvailable(ctx, cameraID); err != nil {
+	if err := s.ensureLiveAvailable(ctx, cameraID, cam.SchoolID); err != nil {
 		if IsLiveOutsideSchoolHours(err) {
 			s.auditLiveOutsideDenied(ctx, meta, cameraID, err)
 		} else {

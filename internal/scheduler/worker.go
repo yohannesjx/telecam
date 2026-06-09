@@ -13,14 +13,16 @@ import (
 
 	"github.com/school-camera-platform/school-camera-platform/internal/database"
 	"github.com/school-camera-platform/school-camera-platform/internal/database/sqlc"
+	"github.com/school-camera-platform/school-camera-platform/internal/schoolschedule"
 )
 
 // Worker applies recording schedule state to camera_stream_states.
 type Worker struct {
-	cfg    WorkerConfig
-	clock  *Clock
-	q      *sqlc.Queries
-	logger *slog.Logger
+	cfg       WorkerConfig
+	clock     *Clock
+	q         *sqlc.Queries
+	schedEval *schoolschedule.Evaluator
+	logger    *slog.Logger
 }
 
 // NewWorker constructs a scheduler worker.
@@ -29,7 +31,13 @@ func NewWorker(cfg WorkerConfig, q *sqlc.Queries, logger *slog.Logger) (*Worker,
 	if err != nil {
 		return nil, err
 	}
-	return &Worker{cfg: cfg, clock: clock, q: q, logger: logger}, nil
+	return &Worker{
+		cfg:    cfg,
+		clock:  clock,
+		q:      q,
+		schedEval: schoolschedule.NewEvaluator(q, cfg.toEnvDefaults()),
+		logger: logger,
+	}, nil
 }
 
 // Run starts gocron polling until ctx is cancelled.
@@ -52,12 +60,45 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) apply(ctx context.Context) {
-	window := w.clock.Evaluate(time.Now().UTC())
+	now := time.Now().UTC()
+	globalWindow := w.clock.Evaluate(now)
+
 	cameras, err := w.q.ListCamerasForScheduler(ctx)
 	if err != nil {
 		w.logger.Error("list cameras for scheduler", "error", err)
-		w.writeHeartbeat(ctx, "ERROR", window)
+		w.writeHeartbeat(ctx, "ERROR", globalWindow)
 		return
+	}
+
+	// Cache per-school eval results to avoid repeated DB lookups.
+	type schoolResult struct {
+		desired string
+		reason  string
+	}
+	schoolCache := make(map[uuid.UUID]schoolResult, 8)
+
+	schoolResultFor := func(schoolID uuid.UUID) schoolResult {
+		if r, ok := schoolCache[schoolID]; ok {
+			return r
+		}
+		settings, err := w.schedEval.ForSchool(ctx, schoolID)
+		if err != nil {
+			w.logger.Error("load school schedule", "school_id", schoolID, "error", err)
+			// Fall back to global window on error.
+			schoolCache[schoolID] = schoolResult{globalWindow.DesiredState, globalWindow.Reason}
+			return schoolCache[schoolID]
+		}
+		eval := settings.Evaluate(now)
+		var desired, reason string
+		if eval.IsOpenNow {
+			desired = DesiredRunning
+			reason = ReasonWithinSchedule
+		} else {
+			desired = DesiredStopped
+			reason = eval.ReasonCode
+		}
+		schoolCache[schoolID] = schoolResult{desired, reason}
+		return schoolCache[schoolID]
 	}
 
 	var started, stopped int
@@ -68,8 +109,10 @@ func (w *Worker) apply(ctx context.Context) {
 			continue
 		}
 
-		desired := window.DesiredState
-		reason := window.Reason
+		sr := schoolResultFor(cam.SchoolID)
+		desired := sr.desired
+		reason := sr.reason
+
 		if _, err := w.q.UpsertCameraStreamState(ctx, sqlc.UpsertCameraStreamStateParams{
 			CameraID:     cam.ID,
 			DesiredState: desired,
@@ -82,6 +125,12 @@ func (w *Worker) apply(ctx context.Context) {
 		if hadPrev && prev.DesiredState == desired {
 			continue
 		}
+		w.logger.Info("stream state transition",
+			"school_id", cam.SchoolID,
+			"camera_id", cam.ID,
+			"desired_state", desired,
+			"reason_code", reason,
+		)
 		if desired == DesiredRunning {
 			started++
 			w.recordScheduleEvent(ctx, cam.ID, cam.SchoolID, EventScheduleStarted, "Recording schedule started for camera")
@@ -94,15 +143,14 @@ func (w *Worker) apply(ctx context.Context) {
 	running, _ := w.q.CountCameraStreamStatesByDesiredState(ctx, DesiredRunning)
 	stoppedCount, _ := w.q.CountCameraStreamStatesByDesiredState(ctx, DesiredStopped)
 	w.logger.Info("schedule applied",
-		"desired", window.DesiredState,
-		"reason", window.Reason,
 		"cameras", len(cameras),
+		"schools_evaluated", len(schoolCache),
 		"transitions_started", started,
 		"transitions_stopped", stopped,
 		"running_desired", running,
 		"stopped_desired", stoppedCount,
 	)
-	w.writeHeartbeat(ctx, "RUNNING", window)
+	w.writeHeartbeat(ctx, "RUNNING", globalWindow)
 }
 
 func (w *Worker) loadPrevious(ctx context.Context, cameraID uuid.UUID) (sqlc.CameraStreamState, bool, error) {

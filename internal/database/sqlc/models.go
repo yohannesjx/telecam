@@ -268,3 +268,16 @@ type WorkerHeartbeat struct {
 	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
+
+type SchoolScheduleSettings struct {
+	SchoolID                  uuid.UUID          `json:"school_id"`
+	Timezone                  string             `json:"timezone"`
+	OpenDays                  string             `json:"open_days"`
+	OpenTime                  string             `json:"open_time"`
+	CloseTime                 string             `json:"close_time"`
+	LiveEnabled               bool               `json:"live_enabled"`
+	TemporaryLivePaused       bool               `json:"temporary_live_paused"`
+	TemporaryLivePauseReason  pgtype.Text        `json:"temporary_live_pause_reason"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+}

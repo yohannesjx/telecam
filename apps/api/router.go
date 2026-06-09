@@ -134,6 +134,7 @@ func setupRouter(
 	superAdmin.Use(auth.RequireRoles(admaccess.RoleSuperAdmin))
 	{
 		superAdmin.POST("/schools", adminHandler.CreateSchool)
+		superAdmin.PUT("/schools/:school_id/schedule", adminHandler.PutSchoolSchedule)
 		superAdmin.POST("/schools/:school_id/admins", adminHandler.AssignSchoolAdmin)
 		superAdmin.GET("/schools/:school_id/admins", adminHandler.ListSchoolAdmins)
 		superAdmin.GET("/parents", adminHandler.ListParents)
@@ -168,6 +169,7 @@ func setupRouter(
 		schoolMgmt.GET("/schools", adminHandler.ListSchools)
 		schoolMgmt.GET("/schools/:school_id", adminHandler.GetSchool)
 		schoolMgmt.PATCH("/schools/:school_id", adminHandler.PatchSchool)
+		schoolMgmt.GET("/schools/:school_id/schedule", adminHandler.GetSchoolSchedule)
 
 		schoolMgmt.POST("/schools/:school_id/classrooms", adminHandler.CreateClassroom)
 		schoolMgmt.GET("/schools/:school_id/classrooms", adminHandler.ListClassrooms)

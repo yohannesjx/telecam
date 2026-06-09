@@ -34,6 +34,21 @@ func (h *Handler) handlePlaybackError(c *gin.Context, err error) {
 		response.NotFound(c, err.Error())
 		return
 	}
+	if playback.IsLiveDisabledForSchool(err) {
+		response.ConflictWithCode(c, "LIVE_DISABLED_FOR_SCHOOL", err.Error(), nil)
+		return
+	}
+	if playback.IsLiveTemporarilyPaused(err) {
+		var paused *playback.ErrLiveTemporarilyPaused
+		if errors.As(err, &paused) {
+			var data any
+			if paused.SafeReason != "" {
+				data = map[string]string{"reason": paused.SafeReason}
+			}
+			response.ConflictWithCode(c, "LIVE_TEMPORARILY_PAUSED", err.Error(), data)
+			return
+		}
+	}
 	if playback.IsLiveOutsideSchoolHours(err) {
 		var outside *playback.ErrLiveOutsideSchoolHours
 		if errors.As(err, &outside) {

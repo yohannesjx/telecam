@@ -27,8 +27,9 @@ services:
         condition: service_completed_successfully
 
   reverse-proxy:
-    ports: !reset
+    ports: !override
       - "80:80"
       - "443:443"
-    volumes: !reset
+      - "443:443/udp"
+    volumes: !override
       - ./docker/caddy/Caddyfile.production:/etc/caddy/Caddyfile:ro

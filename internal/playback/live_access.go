@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/school-camera-platform/school-camera-platform/internal/scheduler"
+	"github.com/school-camera-platform/school-camera-platform/internal/schoolschedule"
 )
 
 // streamStateSnapshot is the scheduler row used for live access decisions.
@@ -36,12 +37,25 @@ func (s *Service) loadStreamState(ctx context.Context, cameraID uuid.UUID) (stre
 	return snap, nil
 }
 
-func (s *Service) ensureLiveAvailable(ctx context.Context, cameraID uuid.UUID) error {
+// ensureLiveAvailable checks whether the school's schedule (per-school or fallback)
+// and the current stream state allow live access for cameraID.
+func (s *Service) ensureLiveAvailable(ctx context.Context, cameraID, schoolID uuid.UUID) error {
 	now := liveAccessNow()
 	snap, err := s.loadStreamState(ctx, cameraID)
 	if err != nil {
 		return err
 	}
+
+	if s.schedEval != nil {
+		settings, err := s.schedEval.ForSchool(ctx, schoolID)
+		if err != nil {
+			return err
+		}
+		result := settings.Evaluate(now)
+		return evaluateLiveAccessFromResult(now, result, snap)
+	}
+
+	// Fallback: use global schedule (for tests that create Service directly).
 	return evaluateLiveAccess(now, s.schedule, snap)
 }
 
@@ -55,12 +69,30 @@ func liveAccessNow() time.Time {
 	return time.Now().UTC()
 }
 
-// evaluateLiveAccess decides whether a parent may open live view at now.
+// evaluateLiveAccess decides whether live view is allowed at now using a *Schedule.
+// This is the backward-compatible path used by existing tests.
 func evaluateLiveAccess(now time.Time, sched *Schedule, snap streamStateSnapshot) error {
-	inWindow := sched.IsWithinRecordingWindow(now)
+	result := sched.toEvalResult(now)
+	return evaluateLiveAccessFromResult(now, result, snap)
+}
 
-	if !inWindow {
-		return liveOutsideSchoolHours(sched, now, snap, schedReasonForOutsideWindow(now, sched, snap))
+// evaluateLiveAccessFromResult is the main live access decision function using
+// a pre-evaluated EvalResult (per-school or global fallback).
+func evaluateLiveAccessFromResult(now time.Time, result schoolschedule.EvalResult, snap streamStateSnapshot) error {
+	if !result.IsOpenNow {
+		switch result.ReasonCode {
+		case schoolschedule.ReasonLiveDisabled:
+			return &ErrLiveDisabledForSchool{}
+		case schoolschedule.ReasonLivePaused:
+			return &ErrLiveTemporarilyPaused{SafeReason: result.TemporaryLivePauseReason}
+		default:
+			// LIVE_OUTSIDE_SCHOOL_HOURS: use snap reason if it's a known schedule stop reason
+			streamReason := result.ReasonCode
+			if isScheduleStopReason(snap.Reason) {
+				streamReason = snap.Reason
+			}
+			return buildLiveOutsideError(now, result, snap, streamReason)
+		}
 	}
 
 	if snap.DesiredState == scheduler.DesiredRunning || !snap.HasRow {
@@ -68,7 +100,7 @@ func evaluateLiveAccess(now time.Time, sched *Schedule, snap streamStateSnapshot
 	}
 
 	if isScheduleStopReason(snap.Reason) {
-		return liveOutsideSchoolHours(sched, now, snap, snap.Reason)
+		return buildLiveOutsideError(now, result, snap, snap.Reason)
 	}
 	if snap.Reason == scheduler.ReasonManualOverride {
 		return deny("live_unavailable_manual_override")
@@ -76,40 +108,31 @@ func evaluateLiveAccess(now time.Time, sched *Schedule, snap streamStateSnapshot
 	return deny("live_not_available")
 }
 
-func schedReasonForOutsideWindow(now time.Time, sched *Schedule, snap streamStateSnapshot) string {
-	if isScheduleStopReason(snap.Reason) {
-		return snap.Reason
-	}
-	local := now.In(sched.loc)
-	if !sched.weekdays[local.Weekday()] {
-		return scheduler.ReasonWeekend
-	}
-	return scheduler.ReasonOutsideSchedule
-}
-
 func isScheduleStopReason(reason string) bool {
 	switch reason {
-	case scheduler.ReasonOutsideSchedule, scheduler.ReasonWeekend, scheduler.ReasonHoliday:
+	case scheduler.ReasonOutsideSchedule, scheduler.ReasonWeekend, scheduler.ReasonHoliday,
+		schoolschedule.ReasonOutsideHours:
 		return true
 	default:
 		return false
 	}
 }
 
-func liveOutsideSchoolHours(sched *Schedule, now time.Time, snap streamStateSnapshot, streamReason string) error {
-	data := LiveOutsideSchoolHoursData{
-		Timezone:           sched.Timezone(),
-		RecordingDays:      sched.RecordingDaysList(),
-		RecordingStartTime: sched.RecordingStartTime(),
-		RecordingEndTime:   sched.RecordingEndTime(),
-		DesiredState:       snap.DesiredState,
-		StreamStateReason:  streamReason,
-	}
-	if next := sched.NextLiveAvailableAt(now); next != nil {
-		data.NextLiveAvailableAt = next.UTC().Format(time.RFC3339)
+func buildLiveOutsideError(now time.Time, result schoolschedule.EvalResult, snap streamStateSnapshot, streamReason string) *ErrLiveOutsideSchoolHours {
+	nextStr := ""
+	if result.NextLiveAvailableAt != nil {
+		nextStr = result.NextLiveAvailableAt.UTC().Format(time.RFC3339)
 	}
 	return &ErrLiveOutsideSchoolHours{
-		Data:              data,
+		Data: LiveOutsideSchoolHoursData{
+			Timezone:            result.Timezone,
+			RecordingDays:       result.OpenDays,
+			RecordingStartTime:  result.OpenTime,
+			RecordingEndTime:    result.CloseTime,
+			NextLiveAvailableAt: nextStr,
+			DesiredState:        snap.DesiredState,
+			StreamStateReason:   streamReason,
+		},
 		StreamStateReason: streamReason,
 		DesiredState:      snap.DesiredState,
 		CurrentTime:       now.UTC().Format(time.RFC3339),
@@ -142,6 +165,34 @@ func (e *ErrLiveOutsideSchoolHours) Error() string {
 // IsLiveOutsideSchoolHours reports a schedule-related live denial.
 func IsLiveOutsideSchoolHours(err error) bool {
 	var target *ErrLiveOutsideSchoolHours
+	return errors.As(err, &target)
+}
+
+// ErrLiveDisabledForSchool is returned when live streaming is disabled for the school.
+type ErrLiveDisabledForSchool struct{}
+
+func (e *ErrLiveDisabledForSchool) Error() string {
+	return "live streaming is disabled for this school"
+}
+
+// IsLiveDisabledForSchool reports whether err is an ErrLiveDisabledForSchool.
+func IsLiveDisabledForSchool(err error) bool {
+	var target *ErrLiveDisabledForSchool
+	return errors.As(err, &target)
+}
+
+// ErrLiveTemporarilyPaused is returned when live streaming is temporarily paused.
+type ErrLiveTemporarilyPaused struct {
+	SafeReason string // may be shown to users; must not contain internal details
+}
+
+func (e *ErrLiveTemporarilyPaused) Error() string {
+	return "live streaming is temporarily paused"
+}
+
+// IsLiveTemporarilyPaused reports whether err is an ErrLiveTemporarilyPaused.
+func IsLiveTemporarilyPaused(err error) bool {
+	var target *ErrLiveTemporarilyPaused
 	return errors.As(err, &target)
 }
 

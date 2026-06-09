@@ -7,6 +7,7 @@ import (
 	"time"
 
 	appconfig "github.com/school-camera-platform/school-camera-platform/internal/config"
+	"github.com/school-camera-platform/school-camera-platform/internal/schoolschedule"
 )
 
 // WorkerConfig holds scheduler-worker settings.
@@ -44,6 +45,16 @@ func LoadWorkerConfig(app *appconfig.Config) WorkerConfig {
 		RecordingEndTime:   end,
 		RecordingDays:      parseRecordingDays(daysRaw),
 		PollInterval:       time.Duration(envIntOr("SCHEDULER_POLL_SECONDS", 30)) * time.Second,
+	}
+}
+
+// toEnvDefaults converts WorkerConfig to schoolschedule.EnvDefaults.
+func (c WorkerConfig) toEnvDefaults() schoolschedule.EnvDefaults {
+	return schoolschedule.EnvDefaults{
+		Timezone:  c.Timezone,
+		OpenTime:  c.RecordingStartTime,
+		CloseTime: c.RecordingEndTime,
+		OpenDays:  strings.Join(recordingDaysToList(c.RecordingDays), ","),
 	}
 }
 
