@@ -1,0 +1,96 @@
+# Dependencies
+node_modules/
+**/node_modules/
+vendor/
+
+# Next.js / frontend builds
+.next/
+**/.next/
+out/
+**/out/
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+
+# Flutter / mobile builds
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+build/
+ios/Pods/
+ios/.symlinks/
+android/.gradle/
+android/app/build/
+
+# Go build/test output
+*.test
+*.prof
+coverage.out
+bin/
+tmp/
+
+# Docker / local runtime
+docker-compose.yml
+docker-compose.override.yml
+*.pid
+
+# Env/secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+secrets/
+credentials/
+firebase-service-account*.json
+google-services.json
+GoogleService-Info.plist
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Uploads/media/generated video
+uploads/
+storage/
+data/
+minio-data/
+postgres-data/
+redis-data/
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.ts
+*.m3u8
+
+# Generated HLS / samples
+samples/
+hls/
+recordings/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Large generated docs/artifacts
+*.zip
+*.tar
+*.tar.gz
+*.dump
+*.sql.gz
