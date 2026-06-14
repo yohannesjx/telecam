@@ -1,0 +1,340 @@
+# Local / dev stack template — copy to docker-compose.yml (gitignored, per-host).
+#   cp docker-compose.example.yml docker-compose.yml
+# Production: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+name: school_backend
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_HOST_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "${MINIO_API_HOST_PORT}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT}:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ${S3_BUCKET}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./docker/minio/init-bucket.sh:/scripts/init-bucket.sh:ro
+      - ./docker/minio/cors.json:/scripts/cors.json:ro
+    entrypoint: ["/bin/sh", "/scripts/init-bucket.sh"]
+    restart: "no"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    entrypoint: ["/app/migrate"]
+    command: ["up"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      MIGRATIONS_PATH: /app/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  migrate-seed:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    entrypoint: ["/app/migrate"]
+    command: ["seed"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SEEDS_PATH: /app/migrations/seeds
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      API_PORT: ${API_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_ACCESS_TTL_MINUTES: ${JWT_ACCESS_TTL_MINUTES:-15}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      BCRYPT_COST: ${BCRYPT_COST:-12}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      REDIS_ADDR: ${REDIS_ADDR}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE}
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
+      HLS_DEMO_CAMERA_ID: ${HLS_DEMO_CAMERA_ID}
+      SIGNED_URL_EXPIRY: ${SIGNED_URL_EXPIRY:-1h}
+      LIVE_PLAYBACK_URL_TTL_MINUTES: ${LIVE_PLAYBACK_URL_TTL_MINUTES:-3}
+      RECORDING_PLAYBACK_URL_TTL_MINUTES: ${RECORDING_PLAYBACK_URL_TTL_MINUTES:-10}
+      LIVE_DELAY_SECONDS: ${LIVE_DELAY_SECONDS:-30}
+      SCHOOL_TIMEZONE: ${SCHOOL_TIMEZONE:-Africa/Addis_Ababa}
+      RECORDING_START_TIME: ${RECORDING_START_TIME:-08:30}
+      RECORDING_END_TIME: ${RECORDING_END_TIME:-16:30}
+      RECORDING_DAYS: ${RECORDING_DAYS:-MON,TUE,WED,THU,FRI}
+      PLAYBACK_RATE_LIMIT_PER_MINUTE: ${PLAYBACK_RATE_LIMIT_PER_MINUTE:-60}
+      TIMELINE_SEGMENT_GAP_SECONDS: ${TIMELINE_SEGMENT_GAP_SECONDS:-30}
+      DASHBOARD_CACHE_TTL_SECONDS: ${DASHBOARD_CACHE_TTL_SECONDS:-45}
+      WORKER_STALE_THRESHOLD_SECONDS: ${WORKER_STALE_THRESHOLD_SECONDS:-120}
+      APP_ENV: ${APP_ENV:-local}
+      DOMAIN: ${DOMAIN:-localhost}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:53000,http://127.0.0.1:53000}
+      DEMO_LIVE_ENABLED: ${DEMO_LIVE_ENABLED:-true}
+      AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}
+      AUTH_RATE_LIMIT_FAIL_CLOSED_PRODUCTION: ${AUTH_RATE_LIMIT_FAIL_CLOSED_PRODUCTION:-true}
+      AUTH_LOGIN_IP_LIMIT: ${AUTH_LOGIN_IP_LIMIT:-20}
+      AUTH_LOGIN_IP_WINDOW_SECONDS: ${AUTH_LOGIN_IP_WINDOW_SECONDS:-60}
+      AUTH_LOGIN_EMAIL_LIMIT: ${AUTH_LOGIN_EMAIL_LIMIT:-5}
+      AUTH_LOGIN_EMAIL_WINDOW_SECONDS: ${AUTH_LOGIN_EMAIL_WINDOW_SECONDS:-900}
+      AUTH_REFRESH_IP_LIMIT: ${AUTH_REFRESH_IP_LIMIT:-60}
+      AUTH_REFRESH_IP_WINDOW_SECONDS: ${AUTH_REFRESH_IP_WINDOW_SECONDS:-60}
+      AUTH_REFRESH_TOKEN_LIMIT: ${AUTH_REFRESH_TOKEN_LIMIT:-10}
+      AUTH_REFRESH_TOKEN_WINDOW_SECONDS: ${AUTH_REFRESH_TOKEN_WINDOW_SECONDS:-60}
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      migrate-seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:${API_PORT}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  stream-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.stream-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
+      STREAM_WORKER_MODE: ${STREAM_WORKER_MODE:-demo}
+      STREAM_WORKER_POLL_SECONDS: ${STREAM_WORKER_POLL_SECONDS:-15}
+      STREAM_WORKER_NAME: ${STREAM_WORKER_NAME:-stream-worker-1}
+      STREAM_WORKER_MAX_RESTARTS: ${STREAM_WORKER_MAX_RESTARTS:-10}
+      STREAM_UPLOAD_MAX_RETRIES: ${STREAM_UPLOAD_MAX_RETRIES:-5}
+      STREAM_UPLOAD_RETRY_BASE_SECONDS: ${STREAM_UPLOAD_RETRY_BASE_SECONDS:-2}
+      CAMERA_OFFLINE_AFTER_SECONDS: ${CAMERA_OFFLINE_AFTER_SECONDS:-120}
+      STREAM_TEMP_CLEANUP_INTERVAL_SECONDS: ${STREAM_TEMP_CLEANUP_INTERVAL_SECONDS:-300}
+      STREAM_TEMP_MAX_AGE_MINUTES: ${STREAM_TEMP_MAX_AGE_MINUTES:-30}
+      HLS_DEMO_CAMERA_ID: ${HLS_DEMO_CAMERA_ID}
+      HLS_SEGMENT_SECONDS: ${HLS_SEGMENT_SECONDS}
+      HLS_LOCAL_TMP_DIR: ${HLS_LOCAL_TMP_DIR}
+      LIVE_DELAY_SECONDS: ${LIVE_DELAY_SECONDS:-30}
+      SAMPLE_VIDEO_PATH: /samples/sample.mp4
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE}
+    volumes:
+      - ./samples:/samples:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate-seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      scheduler-worker:
+        condition: service_started
+
+  retention-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.go
+      args:
+        SERVICE: retention-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      RETENTION_WORKER_NAME: ${RETENTION_WORKER_NAME:-retention-worker-1}
+      RETENTION_RUN_INTERVAL_MINUTES: ${RETENTION_RUN_INTERVAL_MINUTES:-60}
+      RETENTION_BATCH_SIZE: ${RETENTION_BATCH_SIZE:-1000}
+      RETENTION_DRY_RUN: ${RETENTION_DRY_RUN:-false}
+      RETENTION_DELETE_OBJECTS: ${RETENTION_DELETE_OBJECTS:-true}
+      RETENTION_DELETE_DB_ROWS: ${RETENTION_DELETE_DB_ROWS:-true}
+      RETENTION_RECORDING_DAYS: ${RETENTION_RECORDING_DAYS:-7}
+      TEMP_PLAYBACK_RETENTION_MINUTES: ${TEMP_PLAYBACK_RETENTION_MINUTES:-60}
+      STORAGE_USAGE_REPORT_HOUR: ${STORAGE_USAGE_REPORT_HOUR:-23}
+      SCHOOL_TIMEZONE: ${SCHOOL_TIMEZONE:-Africa/Addis_Ababa}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate-seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+
+  scheduler-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.go
+      args:
+        SERVICE: scheduler-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SCHEDULER_WORKER_NAME: ${SCHEDULER_WORKER_NAME:-scheduler-worker-1}
+      SCHEDULER_TIMEZONE: ${SCHEDULER_TIMEZONE:-}
+      SCHEDULER_RECORDING_START_TIME: ${SCHEDULER_RECORDING_START_TIME:-}
+      SCHEDULER_RECORDING_END_TIME: ${SCHEDULER_RECORDING_END_TIME:-}
+      SCHEDULER_RECORDING_DAYS: ${SCHEDULER_RECORDING_DAYS:-}
+      SCHEDULER_POLL_SECONDS: ${SCHEDULER_POLL_SECONDS:-30}
+      SCHOOL_TIMEZONE: ${SCHOOL_TIMEZONE:-Africa/Addis_Ababa}
+      RECORDING_START_TIME: ${RECORDING_START_TIME:-08:30}
+      RECORDING_END_TIME: ${RECORDING_END_TIME:-16:30}
+      RECORDING_DAYS: ${RECORDING_DAYS:-MON,TUE,WED,THU,FRI}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate-seed:
+        condition: service_completed_successfully
+
+  alert-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.go
+      args:
+        SERVICE: alert-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      ALERT_WORKER_NAME: ${ALERT_WORKER_NAME:-alert-worker-1}
+      ALERT_WORKER_POLL_SECONDS: ${ALERT_WORKER_POLL_SECONDS:-15}
+      ALERT_DELIVERY_MAX_ATTEMPTS: ${ALERT_DELIVERY_MAX_ATTEMPTS:-5}
+      ALERT_SEND_SEVERITIES: ${ALERT_SEND_SEVERITIES:-CRITICAL,WARNING}
+      TELEGRAM_ALERTS_ENABLED: ${TELEGRAM_ALERTS_ENABLED:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      SCHOOL_TIMEZONE: ${SCHOOL_TIMEZONE:-Africa/Addis_Ababa}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate-seed:
+        condition: service_completed_successfully
+
+  health-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.go
+      args:
+        SERVICE: health-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      HEALTH_WORKER_NAME: ${HEALTH_WORKER_NAME:-health-worker-1}
+      HEALTH_CHECK_INTERVAL_SECONDS: ${HEALTH_CHECK_INTERVAL_SECONDS:-30}
+      CAMERA_OFFLINE_ALERT_SECONDS: ${CAMERA_OFFLINE_ALERT_SECONDS:-300}
+      SCHOOL_OFFLINE_ALERT_SECONDS: ${SCHOOL_OFFLINE_ALERT_SECONDS:-600}
+      NO_SEGMENT_ALERT_SECONDS: ${NO_SEGMENT_ALERT_SECONDS:-180}
+      PLAYLIST_STALE_ALERT_SECONDS: ${PLAYLIST_STALE_ALERT_SECONDS:-180}
+      UPLOAD_FAILURE_ALERT_COUNT: ${UPLOAD_FAILURE_ALERT_COUNT:-5}
+      FFMPEG_RESTART_ALERT_COUNT: ${FFMPEG_RESTART_ALERT_COUNT:-5}
+      HEALTH_EVENT_LOOKBACK_MINUTES: ${HEALTH_EVENT_LOOKBACK_MINUTES:-10}
+      STREAM_WORKER_STALE_INTERVAL_MULTIPLIER: ${STREAM_WORKER_STALE_INTERVAL_MULTIPLIER:-2}
+      SCHOOL_TIMEZONE: ${SCHOOL_TIMEZONE:-Africa/Addis_Ababa}
+      RECORDING_START_TIME: ${RECORDING_START_TIME:-08:30}
+      RECORDING_END_TIME: ${RECORDING_END_TIME:-16:30}
+      RECORDING_DAYS: ${RECORDING_DAYS:-MON,TUE,WED,THU,FRI}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_REGION: ${S3_REGION}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate-seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+      stream-worker:
+        condition: service_started
+
+  reverse-proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${REVERSE_PROXY_HOST_PORT}:80"
+      # Production: also map 443:443 and use docker/caddy/Caddyfile.production
+    environment:
+      API_PORT: ${API_PORT}
+      DOMAIN: ${DOMAIN:-localhost}
+      CADDY_EMAIL: ${CADDY_EMAIL:-}
+    volumes:
+      - ./docker/caddy/Caddyfile.local:/etc/caddy/Caddyfile:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:

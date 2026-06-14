@@ -1,0 +1,29 @@
+# Example production Caddyfile for a custom domain.
+#
+# This is a documentation reference only — not used by Docker Compose.
+# The actual Caddy configs used in the Docker stack are:
+#   school/backend/docker/caddy/Caddyfile.local       ← local dev (HTTP only)
+#   school/backend/docker/caddy/Caddyfile.production  ← production (HTTPS + Let's Encrypt)
+#
+# To deploy: copy Caddyfile.production to your server Caddy mount and set env vars.
+# See school/backend/README.md § Caddy: local vs production.
+
+camera.example.com {
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+	}
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:${API_PORT}
+	}
+
+	handle {
+		reverse_proxy api:${API_PORT}
+	}
+}

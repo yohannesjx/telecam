@@ -1,14 +1,33 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Can } from "@/components/auth/Can";
 import { ParentBillingSection } from "@/components/parents/ParentBillingSection";
+import { ParentCodeSection } from "@/components/parents/ParentCodeSection";
 import { ParentStatusBadge } from "@/components/parents/ParentStatusBadge";
 import { useParentDetailQuery } from "@/lib/admin/use-parents-queries";
 
 export function ParentDetailPage({ parentId }: { parentId: string }) {
   const query = useParentDetailQuery(parentId);
   const parent = query.data;
+
+  // Unique linked schools for this parent — used to pick a school_id when the
+  // admin generates a parent code. The backend requires school_id on every
+  // generate call because a parent can belong to multiple schools.
+  const linkedSchools = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string }>();
+    for (const child of parent?.linkedChildren ?? []) {
+      if (child.schoolId && !seen.has(child.schoolId)) {
+        seen.set(child.schoolId, {
+          id: child.schoolId,
+          name: child.schoolName ?? "Unknown school",
+        });
+      }
+    }
+    return [...seen.values()];
+  }, [parent?.linkedChildren]);
 
   if (query.isLoading) return <p>Loading parent…</p>;
   if (!parent) return <p>Parent not found.</p>;
@@ -39,6 +58,9 @@ export function ParentDetailPage({ parentId }: { parentId: string }) {
           </div>
         )}
       </div>
+      <Can permission="parents:create">
+        <ParentCodeSection parentId={parentId} schools={linkedSchools} />
+      </Can>
       <Can permission="billing:view">
         <ParentBillingSection parentId={parentId} />
       </Can>
